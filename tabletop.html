@@ -1,0 +1,3320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fableboard — Virtual Tabletop</title>
+<style>
+:root{
+  --wood-dark:#241a12; --wood:#3a2a1b; --wood-light:#4d3a26;
+  --parch:#efe3c4; --parch-dark:#e2d1a8; --ink:#2b2014;
+  --gold:#c9a227; --gold-bright:#e8c454; --red:#a5372c; --green:#4e7a3a;
+  --blue:#3b6b8a; --text:#e8dcc0; --text-dim:#a99c7e;
+  --panel:#2e2216; --panel-edge:#5a4630;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%; overflow:hidden;}
+body{
+  font-family:Georgia,'Times New Roman',serif; background:var(--wood-dark); color:var(--text);
+  display:flex; flex-direction:column;
+}
+button{font-family:inherit; cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+
+/* ---------- Top bar ---------- */
+#topbar{
+  display:flex; align-items:center; gap:10px; padding:6px 14px;
+  background:linear-gradient(#43301d,#2c1f12); border-bottom:2px solid var(--panel-edge);
+  flex-shrink:0; user-select:none;
+}
+#logo{font-size:19px; font-weight:bold; color:var(--gold-bright); letter-spacing:1px; text-shadow:0 2px 3px #000;}
+#logo small{color:var(--text-dim); font-size:11px; letter-spacing:0; margin-left:6px; font-style:italic;}
+.mode-tabs{display:flex; gap:4px; margin-left:18px;}
+.mode-tab{
+  padding:5px 14px; border-radius:6px 6px 0 0; border:1px solid var(--panel-edge); border-bottom:none;
+  background:#241a10; color:var(--text-dim); font-size:13px;
+}
+.mode-tab.active{background:var(--parch); color:var(--ink); font-weight:bold;}
+#topbar .spacer{flex:1;}
+.tb-btn{
+  background:var(--wood-light); border:1px solid var(--panel-edge); color:var(--text);
+  border-radius:6px; padding:5px 11px; font-size:13px;
+}
+.tb-btn:hover{background:#5f4930; border-color:var(--gold);}
+
+/* ---------- Layout ---------- */
+#main{flex:1; display:flex; min-height:0;}
+#boardwrap{flex:1; position:relative; background:#191510; min-width:0;}
+#board{position:absolute; inset:0; width:100%; height:100%; cursor:grab;}
+#board.painting{cursor:crosshair;}
+#board.targeting{cursor:crosshair;}
+
+#board-tools{
+  position:absolute; top:10px; left:10px; display:flex; flex-direction:column; gap:6px; z-index:5;
+}
+.bt-btn{
+  width:34px; height:34px; border-radius:8px; border:1px solid var(--panel-edge);
+  background:rgba(46,34,22,.92); color:var(--text); font-size:16px; line-height:1;
+}
+.bt-btn:hover{border-color:var(--gold);}
+.bt-btn.on{background:var(--gold); color:var(--ink);}
+
+#hoverinfo{
+  position:absolute; bottom:10px; left:10px; z-index:5; font-size:12px; color:var(--text-dim);
+  background:rgba(20,15,10,.85); padding:4px 10px; border-radius:6px; pointer-events:none;
+  border:1px solid #443626; font-family:Verdana,sans-serif;
+}
+#turn-banner{
+  position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:6; pointer-events:none;
+  background:rgba(30,22,13,.95); border:1px solid var(--gold); border-radius:8px;
+  padding:6px 18px; font-size:14px; color:var(--gold-bright); text-align:center;
+  box-shadow:0 4px 14px rgba(0,0,0,.5);
+}
+#turn-banner .tb-sub{font-size:11px; color:var(--text-dim); font-family:Verdana,sans-serif; margin-top:2px;}
+.hidden{display:none !important;}
+
+/* ---------- Editor palette ---------- */
+#editor-palette{
+  position:absolute; top:10px; right:10px; z-index:6; width:230px;
+  background:rgba(38,28,18,.96); border:1px solid var(--panel-edge); border-radius:10px;
+  padding:12px; font-family:Verdana,sans-serif; font-size:12px;
+  max-height:calc(100% - 20px); overflow-y:auto;
+}
+#editor-palette h3{font-family:Georgia,serif; color:var(--gold-bright); font-size:14px; margin-bottom:8px;}
+#editor-palette h4{color:var(--text-dim); font-size:11px; margin:10px 0 5px; text-transform:uppercase; letter-spacing:.5px;}
+.terrain-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:5px;}
+.terr-btn{
+  height:38px; border-radius:6px; border:2px solid #443626; font-size:15px; position:relative;
+  display:flex; align-items:center; justify-content:center;
+}
+.terr-btn.sel{border-color:var(--gold-bright); box-shadow:0 0 6px rgba(232,196,84,.5);}
+.pal-row{display:flex; gap:6px; align-items:center; margin:6px 0;}
+.pal-row label{color:var(--text-dim); flex:1;}
+.pal-row input[type=number]{width:52px; background:#1d150d; border:1px solid #443626; color:var(--text); border-radius:4px; padding:3px 5px;}
+.pal-row input[type=text]{flex:1; background:#1d150d; border:1px solid #443626; color:var(--text); border-radius:4px; padding:4px 6px; min-width:0;}
+.pal-btn{
+  width:100%; margin-top:6px; padding:7px; border-radius:6px; border:1px solid var(--panel-edge);
+  background:var(--wood-light); color:var(--text); font-size:12px;
+}
+.pal-btn:hover{border-color:var(--gold);}
+.pal-btn.primary{background:var(--gold); color:var(--ink); font-weight:bold;}
+#maplib{display:flex; flex-direction:column; gap:4px;}
+.maplib-item{display:flex; gap:4px; align-items:center; background:#1d150d; border:1px solid #443626; border-radius:5px; padding:4px 7px;}
+.maplib-item span{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.maplib-item button{background:none; border:none; color:var(--text-dim); font-size:12px;}
+.maplib-item button:hover{color:var(--gold-bright);}
+
+/* ---------- Sidebar ---------- */
+#sidebar{
+  width:380px; flex-shrink:0; display:flex; flex-direction:column;
+  background:var(--panel); border-left:2px solid var(--panel-edge); min-height:0;
+}
+#side-tabs{display:flex; border-bottom:1px solid var(--panel-edge); flex-shrink:0;}
+.side-tab{
+  flex:1; padding:9px 0; background:none; border:none; color:var(--text-dim);
+  font-size:13px; border-bottom:2px solid transparent;
+}
+.side-tab.active{color:var(--gold-bright); border-bottom-color:var(--gold);}
+.side-panel{flex:1; min-height:0; display:none; flex-direction:column;}
+.side-panel.active{display:flex;}
+
+/* ---------- Chat / story ---------- */
+#chatlog{flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:9px;}
+.msg{border-radius:8px; padding:8px 11px; font-size:13.5px; line-height:1.45; max-width:100%; word-wrap:break-word;}
+.msg-dm{background:var(--parch); color:var(--ink); border:1px solid #c9b98d; box-shadow:0 1px 3px rgba(0,0,0,.35);}
+.msg-dm .who{color:#7a5a17;}
+.msg-player{background:#3a4a5c; color:#e8eef4; align-self:flex-end; border:1px solid #4d6278;}
+.msg-system{background:none; color:var(--text-dim); font-size:12px; font-style:italic; text-align:center; padding:2px;}
+.msg-error{background:#4a2320; color:#f0c0ba; border:1px solid #7a3a32; font-size:12.5px; font-family:Verdana,sans-serif;}
+.msg-roll{
+  background:#26313a; color:#cfe0ee; border:1px solid #3b4d5e; font-family:Verdana,sans-serif; font-size:12px;
+}
+.msg-roll b{color:#fff; font-size:14px;}
+.msg-roll .crit{color:#7ee07e; font-weight:bold;}
+.msg-roll .fumble{color:#e07e7e; font-weight:bold;}
+.msg .who{font-weight:bold; font-size:11px; text-transform:uppercase; letter-spacing:.6px; display:block; margin-bottom:3px; font-family:Verdana,sans-serif;}
+.msg-dm p{margin-bottom:6px;} .msg-dm p:last-child{margin-bottom:0;}
+.msg-dm em{color:#6b4f1d;}
+
+.toolcard{
+  background:#33261685; border:1px dashed var(--gold); border-radius:8px; padding:8px 11px;
+  font-family:Verdana,sans-serif; font-size:12px;
+}
+.toolcard .tc-name{color:var(--gold-bright); font-weight:bold;}
+.toolcard .tc-detail{color:var(--text-dim); margin:4px 0; font-size:11.5px; word-break:break-all;}
+.toolcard .tc-actions{display:flex; gap:6px; margin-top:6px;}
+.toolcard .tc-actions button{
+  padding:4px 12px; border-radius:5px; border:1px solid var(--panel-edge); font-size:12px;
+  background:var(--wood-light); color:var(--text);
+}
+.toolcard .tc-actions .ok{background:var(--green); border-color:#6a9a54; color:#fff;}
+.toolcard .tc-actions .no{background:var(--red); border-color:#c05a4e; color:#fff;}
+.toolcard.resolved{opacity:.62; border-style:solid; border-color:#5a4630;}
+.toolcard .tc-status{font-style:italic; color:var(--text-dim); margin-top:4px;}
+
+#dm-status{
+  padding:4px 12px; font-size:11px; color:var(--text-dim); font-family:Verdana,sans-serif;
+  display:flex; align-items:center; gap:8px; border-top:1px solid #3d2f1f; flex-shrink:0;
+}
+#dm-status .dot{width:8px; height:8px; border-radius:50%; background:#555; flex-shrink:0;}
+#dm-status.thinking .dot{background:var(--gold-bright); animation:pulse 1s infinite;}
+@keyframes pulse{50%{opacity:.3;}}
+#dm-status .spacer{flex:1;}
+#undo-dm{background:none; border:1px solid #4d3a26; color:var(--text-dim); border-radius:4px; font-size:10px; padding:2px 7px;}
+#undo-dm:hover{color:var(--gold-bright); border-color:var(--gold);}
+
+#chatform{display:flex; gap:7px; padding:10px 12px; border-top:1px solid var(--panel-edge); flex-shrink:0;}
+#chatinput{
+  flex:1; background:#1d150d; border:1px solid #4d3a26; color:var(--text); border-radius:8px;
+  padding:9px 12px; font-size:13.5px; resize:none; height:44px; line-height:1.4;
+}
+#chatinput:focus{outline:none; border-color:var(--gold);}
+#chatsend{background:var(--gold); color:var(--ink); border:none; border-radius:8px; padding:0 16px; font-weight:bold; font-size:14px;}
+#chatsend:disabled{opacity:.45; cursor:default;}
+#story-topbar{
+  display:flex; gap:8px; align-items:center; padding:8px 12px; border-bottom:1px solid #3d2f1f;
+  flex-shrink:0; font-family:Verdana,sans-serif; font-size:11px; color:var(--text-dim);
+}
+#autonomy-sel{background:#1d150d; color:var(--text); border:1px solid #4d3a26; border-radius:5px; padding:3px 6px; font-size:11px;}
+#new-adventure{background:var(--red); color:#fff; border:none; border-radius:5px; padding:4px 10px; font-size:11px;}
+#new-adventure:hover{background:#c04a3d;}
+
+/* ---------- Party panel ---------- */
+#party-list{flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px;}
+.pc-card{
+  background:linear-gradient(#3b2c1b,#332517); border:1px solid var(--panel-edge); border-radius:10px;
+  padding:10px 12px; display:flex; gap:12px; align-items:center; cursor:pointer;
+}
+.pc-card:hover{border-color:var(--gold);}
+.pc-portrait{
+  width:52px; height:52px; border-radius:50%; background:#1d150d; border:2px solid var(--gold);
+  display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0;
+}
+.pc-info{flex:1; min-width:0;}
+.pc-name{font-size:15px; color:var(--gold-bright); font-weight:bold;}
+.pc-sub{font-size:11px; color:var(--text-dim); font-family:Verdana,sans-serif; margin:2px 0 5px;}
+.bar{height:7px; background:#191209; border-radius:4px; overflow:hidden; margin-top:3px; border:1px solid #00000060;}
+.bar i{display:block; height:100%; border-radius:4px; transition:width .3s;}
+.bar-hp i{background:linear-gradient(90deg,#7ec26a,#4e7a3a);}
+.bar-hp.low i{background:linear-gradient(90deg,#d67a5a,#a5372c);}
+.bar-mana i{background:linear-gradient(90deg,#6a9ac2,#3b6b8a);}
+.bar-label{font-size:10px; color:var(--text-dim); font-family:Verdana,sans-serif; display:flex; justify-content:space-between; margin-top:4px;}
+#party-actions{padding:10px 12px; border-top:1px solid var(--panel-edge); display:flex; gap:8px; flex-shrink:0;}
+.big-btn{
+  flex:1; padding:10px; border-radius:8px; border:1px solid var(--panel-edge);
+  background:var(--wood-light); color:var(--text); font-size:13px;
+}
+.big-btn:hover{border-color:var(--gold);}
+.big-btn.primary{background:var(--gold); color:var(--ink); font-weight:bold;}
+.empty-note{color:var(--text-dim); font-size:12.5px; font-style:italic; text-align:center; padding:26px 20px; line-height:1.6;}
+
+/* ---------- Combat panel ---------- */
+#combat-body{flex:1; overflow-y:auto; padding:12px;}
+#init-list{display:flex; flex-direction:column; gap:5px; margin-bottom:12px;}
+.init-row{
+  display:flex; align-items:center; gap:9px; background:#271d11; border:1px solid #3d2f1f;
+  border-radius:7px; padding:6px 10px; font-size:13px;
+}
+.init-row.current{border-color:var(--gold); background:#33260f; box-shadow:0 0 8px rgba(201,162,39,.3);}
+.init-row .emoji{font-size:19px;}
+.init-row .nm{flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;}
+.init-row .hp{font-size:11px; font-family:Verdana,sans-serif; color:var(--text-dim);}
+.init-row .init{font-family:Verdana,sans-serif; font-size:12px; color:var(--gold-bright); width:22px; text-align:right;}
+.init-row.dead{opacity:.45; text-decoration:line-through;}
+.init-row.enemy .nm{color:#e0a29a;}
+.init-row.party .nm{color:#cfe0b8;}
+#action-panel{background:#271d11; border:1px solid var(--panel-edge); border-radius:9px; padding:11px; font-family:Verdana,sans-serif; font-size:12px;}
+#action-panel h4{font-family:Georgia,serif; color:var(--gold-bright); font-size:14px; margin-bottom:7px;}
+.econ{display:flex; gap:6px; margin-bottom:9px;}
+.econ span{flex:1; text-align:center; padding:4px; border-radius:5px; background:#191209; color:var(--text-dim); font-size:10.5px; border:1px solid #33281a;}
+.econ span.avail{color:#9ec27e; border-color:#4e7a3a;}
+.act-btns{display:flex; flex-wrap:wrap; gap:6px;}
+.act-btn{
+  padding:6px 11px; border-radius:6px; border:1px solid var(--panel-edge); background:var(--wood-light);
+  color:var(--text); font-size:12px;
+}
+.act-btn:hover:not(:disabled){border-color:var(--gold);}
+.act-btn:disabled{opacity:.4; cursor:default;}
+.act-btn.end{background:var(--red); color:#fff; border-color:#7a3a32;}
+#combat-controls{padding:10px 12px; border-top:1px solid var(--panel-edge); display:flex; gap:8px; flex-shrink:0;}
+
+/* ---------- Modals ---------- */
+#modal-veil{
+  position:fixed; inset:0; background:rgba(10,7,4,.75); z-index:50;
+  display:flex; align-items:center; justify-content:center; padding:20px;
+}
+.modal{
+  background:linear-gradient(#3b2c1b,#2c2013); border:2px solid var(--panel-edge); border-radius:14px;
+  width:100%; max-width:640px; max-height:92vh; display:flex; flex-direction:column;
+  box-shadow:0 14px 50px rgba(0,0,0,.7);
+}
+.modal-head{
+  display:flex; align-items:center; padding:14px 20px; border-bottom:1px solid var(--panel-edge); flex-shrink:0;
+}
+.modal-head h2{font-size:18px; color:var(--gold-bright); flex:1;}
+.modal-x{background:none; border:none; color:var(--text-dim); font-size:20px;}
+.modal-x:hover{color:#fff;}
+.modal-body{padding:18px 20px; overflow-y:auto; font-size:13.5px;}
+.modal-foot{
+  display:flex; gap:10px; padding:13px 20px; border-top:1px solid var(--panel-edge);
+  justify-content:flex-end; flex-shrink:0;
+}
+.m-btn{padding:9px 20px; border-radius:8px; border:1px solid var(--panel-edge); background:var(--wood-light); color:var(--text); font-size:13px;}
+.m-btn.primary{background:var(--gold); color:var(--ink); font-weight:bold; border-color:var(--gold);}
+.m-btn:disabled{opacity:.4; cursor:default;}
+.m-btn:hover:not(:disabled){filter:brightness(1.12);}
+
+.form-row{margin-bottom:13px;}
+.form-row label{display:block; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--text-dim); font-family:Verdana,sans-serif; margin-bottom:5px;}
+.form-row input[type=text],.form-row input[type=password],.form-row select,.form-row textarea{
+  width:100%; background:#1d150d; border:1px solid #4d3a26; border-radius:7px; color:var(--text);
+  padding:9px 11px; font-size:13.5px;
+}
+.form-row textarea{resize:vertical; min-height:64px;}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none; border-color:var(--gold);}
+.form-hint{font-size:11px; color:var(--text-dim); margin-top:4px; font-family:Verdana,sans-serif; line-height:1.5;}
+
+/* ---------- Character creator ---------- */
+.wiz-steps{display:flex; gap:3px; padding:0 20px; margin-top:12px; flex-shrink:0;}
+.wiz-step{
+  flex:1; text-align:center; font-size:10px; font-family:Verdana,sans-serif; color:var(--text-dim);
+  padding:5px 2px; border-bottom:3px solid #443626; text-transform:uppercase; letter-spacing:.4px;
+}
+.wiz-step.on{color:var(--gold-bright); border-bottom-color:var(--gold);}
+.wiz-step.done{color:#8fae76; border-bottom-color:#4e7a3a;}
+.choice-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:9px;}
+.choice-card{
+  background:#271d11; border:2px solid #3d2f1f; border-radius:9px; padding:11px; cursor:pointer; text-align:center;
+}
+.choice-card:hover{border-color:#6a5335;}
+.choice-card.sel{border-color:var(--gold-bright); background:#33260f; box-shadow:0 0 8px rgba(232,196,84,.35);}
+.choice-card .cc-emoji{font-size:30px;}
+.choice-card .cc-name{font-size:14px; color:var(--gold-bright); margin:4px 0 3px; font-weight:bold;}
+.choice-card .cc-desc{font-size:11px; color:var(--text-dim); font-family:Verdana,sans-serif; line-height:1.45;}
+.detail-box{
+  background:#271d11; border:1px solid #3d2f1f; border-radius:9px; padding:12px 14px; margin-top:12px;
+  font-size:12px; font-family:Verdana,sans-serif; color:var(--text-dim); line-height:1.55;
+}
+.detail-box b{color:var(--text);}
+.abil-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-top:10px;}
+.abil-cell{background:#271d11; border:1px solid #3d2f1f; border-radius:9px; padding:9px; text-align:center;}
+.abil-cell .ab-name{font-size:10.5px; color:var(--text-dim); font-family:Verdana,sans-serif; text-transform:uppercase; letter-spacing:1px;}
+.abil-cell .ab-score{font-size:23px; color:var(--gold-bright); font-weight:bold; margin:3px 0;}
+.abil-cell .ab-mod{font-size:12px; color:var(--text-dim); font-family:Verdana,sans-serif;}
+.abil-cell .ab-ctl{display:flex; justify-content:center; gap:7px; margin-top:5px;}
+.abil-cell .ab-ctl button{
+  width:24px; height:24px; border-radius:5px; border:1px solid var(--panel-edge); background:var(--wood-light);
+  color:var(--text); font-size:14px; line-height:1;
+}
+.abil-cell .ab-ctl button:disabled{opacity:.3;}
+.abil-cell select{width:100%; margin-top:5px; background:#1d150d; color:var(--text); border:1px solid #4d3a26; border-radius:5px; padding:3px;}
+.method-tabs{display:flex; gap:6px; margin-bottom:5px;}
+.method-tab{
+  flex:1; padding:7px; border-radius:7px; border:1px solid #3d2f1f; background:#271d11;
+  color:var(--text-dim); font-size:12px; font-family:Verdana,sans-serif;
+}
+.method-tab.on{border-color:var(--gold); color:var(--gold-bright); background:#33260f;}
+.points-left{text-align:center; font-size:12px; color:var(--text-dim); font-family:Verdana,sans-serif; margin:8px 0;}
+.points-left b{color:var(--gold-bright); font-size:15px;}
+.skill-list{display:grid; grid-template-columns:1fr 1fr; gap:7px;}
+.skill-pick{
+  display:flex; align-items:center; gap:8px; background:#271d11; border:1px solid #3d2f1f;
+  border-radius:7px; padding:7px 10px; font-size:12.5px; cursor:pointer; font-family:Verdana,sans-serif;
+}
+.skill-pick.sel{border-color:var(--gold-bright); color:var(--gold-bright);}
+.skill-pick.locked{opacity:.55; cursor:default;}
+.skill-pick input{accent-color:var(--gold);}
+.emoji-grid{display:grid; grid-template-columns:repeat(8,1fr); gap:6px; margin-top:8px;}
+.emoji-opt{
+  font-size:23px; padding:6px 0; text-align:center; border-radius:8px; border:2px solid transparent;
+  background:#271d11; cursor:pointer;
+}
+.emoji-opt.sel{border-color:var(--gold-bright); background:#33260f;}
+.summary-sheet{display:grid; grid-template-columns:1fr 1fr; gap:8px 18px; font-size:12.5px; font-family:Verdana,sans-serif;}
+.summary-sheet dt{color:var(--text-dim); font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; margin-top:7px;}
+.summary-sheet dd{color:var(--text);}
+
+/* ---------- Character sheet ---------- */
+.sheet-head{display:flex; gap:14px; align-items:center; margin-bottom:14px;}
+.sheet-head .pc-portrait{width:64px; height:64px; font-size:34px;}
+.sheet-stats{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-bottom:12px;}
+.stat-pill{background:#271d11; border:1px solid #3d2f1f; border-radius:8px; text-align:center; padding:7px 2px;}
+.stat-pill .sp-l{font-size:9.5px; color:var(--text-dim); font-family:Verdana,sans-serif; text-transform:uppercase;}
+.stat-pill .sp-v{font-size:17px; color:var(--gold-bright); font-weight:bold;}
+.stat-pill .sp-m{font-size:10.5px; color:var(--text-dim); font-family:Verdana,sans-serif;}
+.sheet-sec{margin-bottom:13px;}
+.sheet-sec h4{font-size:13px; color:var(--gold-bright); border-bottom:1px solid #3d2f1f; padding-bottom:4px; margin-bottom:7px;}
+.sheet-sec .roll-row{
+  display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:12.5px; font-family:Verdana,sans-serif;
+}
+.roll-row .rr-name{flex:1;}
+.roll-row .rr-mod{color:var(--text-dim); width:34px; text-align:right;}
+.roll-row button{
+  background:var(--wood-light); border:1px solid var(--panel-edge); color:var(--text);
+  border-radius:5px; font-size:11px; padding:3px 10px;
+}
+.roll-row button:hover{border-color:var(--gold);}
+.inv-list{font-size:12.5px; font-family:Verdana,sans-serif; line-height:1.8;}
+.tag{display:inline-block; background:#443626; border-radius:4px; padding:1px 7px; font-size:10.5px; margin:0 3px 3px 0; font-family:Verdana,sans-serif;}
+.tag.cond{background:#5a3230; color:#f0c8c2;}
+
+/* ---------- Dice modal quick ---------- */
+#dice-quick{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
+#dice-quick button{
+  padding:9px 0; width:62px; border-radius:8px; border:1px solid var(--panel-edge);
+  background:#271d11; color:var(--gold-bright); font-size:14px; font-weight:bold;
+}
+#dice-quick button:hover{border-color:var(--gold);}
+.dice-result-big{
+  text-align:center; font-size:38px; color:var(--gold-bright); padding:14px; font-weight:bold;
+  text-shadow:0 3px 8px rgba(0,0,0,.6); min-height:74px;
+}
+.dice-result-big small{display:block; font-size:12px; color:var(--text-dim); font-family:Verdana,sans-serif; font-weight:normal; margin-top:4px;}
+
+/* scrollbars */
+::-webkit-scrollbar{width:9px;}
+::-webkit-scrollbar-track{background:#1d150d;}
+::-webkit-scrollbar-thumb{background:#4d3a26; border-radius:5px;}
+::-webkit-scrollbar-thumb:hover{background:#6a5335;}
+
+@media (max-width:900px){
+  #sidebar{width:310px;}
+}
+</style>
+</head>
+<body>
+<header id="topbar">
+  <div id="logo">⚔️ Fableboard<small>a tabletop for grand tales</small></div>
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="play">▶ Play</button>
+    <button class="mode-tab" data-mode="edit">✏️ Map Editor</button>
+  </div>
+  <div class="spacer"></div>
+  <button class="tb-btn" id="btn-dice" title="Dice roller">🎲 Dice</button>
+  <button class="tb-btn" id="btn-export" title="Export campaign">📤 Export</button>
+  <button class="tb-btn" id="btn-import" title="Import campaign">📥 Import</button>
+  <button class="tb-btn" id="btn-settings" title="Settings">⚙️</button>
+</header>
+<main id="main">
+  <div id="boardwrap">
+    <canvas id="board"></canvas>
+    <div id="board-tools">
+      <button class="bt-btn" id="bt-zoomin" title="Zoom in">＋</button>
+      <button class="bt-btn" id="bt-zoomout" title="Zoom out">－</button>
+      <button class="bt-btn" id="bt-center" title="Center view">⌖</button>
+      <button class="bt-btn" id="bt-measure" title="Measure distance">📏</button>
+      <button class="bt-btn" id="bt-fog" title="Toggle fog rendering">🌫</button>
+    </div>
+    <div id="hoverinfo">—</div>
+    <div id="turn-banner" class="hidden"></div>
+
+    <div id="editor-palette" class="hidden">
+      <h3>🛠 Map Editor</h3>
+      <h4>Terrain brush</h4>
+      <div class="terrain-grid" id="terrain-grid"></div>
+      <div class="pal-row"><label>Brush size</label><input type="number" id="brush-size" min="1" max="6" value="1"></div>
+      <h4>Fog of war</h4>
+      <div class="pal-row">
+        <button class="pal-btn" id="fog-reveal-all" style="margin-top:0">Reveal all</button>
+        <button class="pal-btn" id="fog-hide-all" style="margin-top:0">Hide all</button>
+      </div>
+      <div class="pal-row"><label><input type="checkbox" id="fog-brush"> Fog brush (paint hide / shift-reveal)</label></div>
+      <h4>Map</h4>
+      <div class="pal-row"><label>Width</label><input type="number" id="map-w" min="10" max="80" value="30"></div>
+      <div class="pal-row"><label>Height</label><input type="number" id="map-h" min="10" max="80" value="22"></div>
+      <button class="pal-btn" id="map-resize">Apply size</button>
+      <button class="pal-btn" id="map-clear">Clear map</button>
+      <h4>Dungeon generator</h4>
+      <div class="pal-row"><label>Rooms</label><input type="number" id="gen-rooms" min="3" max="16" value="7"></div>
+      <div class="pal-row"><label>Seed</label><input type="text" id="gen-seed" placeholder="random"></div>
+      <button class="pal-btn primary" id="gen-dungeon">⚒ Generate dungeon</button>
+      <h4>Map library</h4>
+      <div class="pal-row"><input type="text" id="map-name" placeholder="Map name…"></div>
+      <button class="pal-btn" id="map-save">Save to library</button>
+      <div id="maplib" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <aside id="sidebar">
+    <div id="side-tabs">
+      <button class="side-tab active" data-tab="story">📜 Story</button>
+      <button class="side-tab" data-tab="party">🛡 Party</button>
+      <button class="side-tab" data-tab="combat">⚔️ Combat</button>
+    </div>
+
+    <div class="side-panel active" id="tab-story">
+      <div id="story-topbar">
+        <span>DM control:</span>
+        <select id="autonomy-sel">
+          <option value="narrator">🗣 Narrator — suggests only</option>
+          <option value="codm" selected>🤝 Co-DM — asks approval</option>
+          <option value="full">🎩 Full DM — acts freely</option>
+        </select>
+        <span class="spacer" style="flex:1"></span>
+        <button id="new-adventure">✨ New Adventure</button>
+      </div>
+      <div id="chatlog"></div>
+      <div id="dm-status"><span class="dot"></span><span id="dm-status-text">DM idle</span><span class="spacer"></span><button id="undo-dm" class="hidden">↩ Undo DM action</button></div>
+      <form id="chatform">
+        <textarea id="chatinput" placeholder="Say or do something… (Enter to send)" rows="1"></textarea>
+        <button type="submit" id="chatsend">➤</button>
+      </form>
+    </div>
+
+    <div class="side-panel" id="tab-party">
+      <div id="party-list"></div>
+      <div id="party-actions">
+        <button class="big-btn primary" id="btn-create-char">➕ Create Character</button>
+      </div>
+    </div>
+
+    <div class="side-panel" id="tab-combat">
+      <div id="combat-body">
+        <div id="init-list"></div>
+        <div id="action-panel"><div class="empty-note">No combat active.<br>Start combat to track initiative and take tactical turns.</div></div>
+      </div>
+      <div id="combat-controls">
+        <button class="big-btn" id="btn-start-combat">⚔️ Start Combat</button>
+        <button class="big-btn hidden" id="btn-end-combat">🕊 End Combat</button>
+      </div>
+    </div>
+  </aside>
+</main>
+<div id="modals"></div>
+<input type="file" id="import-file" accept=".json" style="display:none">
+<script>
+"use strict";
+
+/* ============================================================
+   FABLE d20 — RULES DATA
+   Single source of truth for the character creator, combat
+   engine, and the AI DM's rules digest.
+   ============================================================ */
+const RULES = {
+  abilities: ["str","dex","con","int","wis","cha"],
+  abilityNames: {str:"Strength", dex:"Dexterity", con:"Constitution", int:"Intelligence", wis:"Wisdom", cha:"Charisma"},
+
+  skills: {
+    athletics:{ab:"str", name:"Athletics"},
+    acrobatics:{ab:"dex", name:"Acrobatics"},
+    stealth:{ab:"dex", name:"Stealth"},
+    arcana:{ab:"int", name:"Arcana"},
+    nature:{ab:"int", name:"Nature"},
+    insight:{ab:"wis", name:"Insight"},
+    perception:{ab:"wis", name:"Perception"},
+    survival:{ab:"wis", name:"Survival"},
+    deception:{ab:"cha", name:"Deception"},
+    intimidation:{ab:"cha", name:"Intimidation"},
+    performance:{ab:"cha", name:"Performance"},
+    persuasion:{ab:"cha", name:"Persuasion"},
+  },
+
+  pointBuy: {budget:27, min:8, max:15, cost:{8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9}},
+  standardArray: [15,14,13,12,10,8],
+  profByLevel: [2,2,2,2,3], // levels 1..5
+  maxLevel: 5,
+  xpToLevel: [0, 300, 900, 2700, 6500], // xp needed to reach level index+1
+
+  species: {
+    human:{ name:"Human", emoji:"🧑", bonus:{str:1,dex:1,con:1,int:1,wis:1,cha:1}, speed:6,
+      traits:["Versatile: +1 to every ability score.","Determined: once per combat, reroll one failed save."],
+      desc:"Adaptable and ambitious, found in every corner of the realm."},
+    elf:{ name:"Elf", emoji:"🧝", bonus:{dex:2,wis:1}, speed:7,
+      traits:["Darkvision: see in darkness up to 12 squares.","Fey Grace: advantage on saves against being charmed."],
+      desc:"Graceful, long-lived folk of forest and starlight."},
+    dwarf:{ name:"Dwarf", emoji:"🧔", bonus:{con:2,str:1}, speed:5,
+      traits:["Darkvision: see in darkness up to 12 squares.","Stoneblood: advantage on saves against poison; +1 HP per level."],
+      desc:"Stout mountain folk, unbending as the stone they carve."},
+    halfling:{ name:"Halfling", emoji:"🧒", bonus:{dex:2,cha:1}, speed:5,
+      traits:["Lucky: reroll natural 1s on attacks, checks, and saves (once each).","Brave: advantage on saves against fear."],
+      desc:"Small, cheerful wanderers with uncanny luck."},
+    orc:{ name:"Orc", emoji:"🧌", bonus:{str:2,con:1}, speed:6,
+      traits:["Relentless: when reduced to 0 HP, drop to 1 HP instead (once per day).","Savage Blows: +1 damage with melee weapons."],
+      desc:"Proud warriors whose strength is matched only by their endurance."},
+    dragonkin:{ name:"Dragonkin", emoji:"🐲", bonus:{str:1,cha:2}, speed:6,
+      traits:["Breath Weapon: once per combat, exhale fire in a 3-square cone (2d6 fire, DEX save DC 8+CON+prof for half).","Scaled Hide: +1 AC when not wearing heavy armor."],
+      desc:"Descendants of dragons, bearing scales and smoldering pride."},
+  },
+
+  classes: {
+    fighter:{ name:"Fighter", emoji:"⚔️", hitDie:10, primary:"str",
+      saves:["str","con"], skillChoices:["athletics","intimidation","perception","survival","acrobatics"], skillCount:2,
+      caster:null, manaPerLevel:0,
+      desc:"A master of weapons and armor who holds the front line.",
+      features:{
+        1:["Weapon Mastery: +1 to all weapon attack rolls.","Second Wind: once per combat, use a quick action to heal 1d10 + level HP."],
+        2:["Action Surge: once per combat, take one extra Action on your turn."],
+        3:["Improved Critical: your weapon attacks crit on 19–20."],
+        4:["Ability Boost: +2 to one ability score (max 20)."],
+        5:["Extra Attack: when you take the Attack action, attack twice."]},
+      kit:{weapons:["longsword","greataxe","bow"], armor:["chainmail","leather"], shieldOption:true},
+    },
+    rogue:{ name:"Rogue", emoji:"🗡", hitDie:8, primary:"dex",
+      saves:["dex","int"], skillChoices:["stealth","acrobatics","deception","perception","insight","persuasion"], skillCount:3,
+      caster:null, manaPerLevel:0,
+      desc:"A shadow-footed expert in stealth, tricks, and lethal precision.",
+      features:{
+        1:["Sneak Attack: +1d6 damage when you attack with advantage or an ally is adjacent to your target.","Thieves' Cant & Tools: proficiency with locks and traps."],
+        2:["Cunning Action: Dash, Disengage, or Hide as a quick action."],
+        3:["Sneak Attack improves to +2d6."],
+        4:["Ability Boost: +2 to one ability score (max 20)."],
+        5:["Uncanny Dodge: halve the damage of one attack against you each round."]},
+      kit:{weapons:["dagger","shortsword","bow"], armor:["leather"], shieldOption:false},
+    },
+    mage:{ name:"Mage", emoji:"🧙", hitDie:6, primary:"int",
+      saves:["int","wis"], skillChoices:["arcana","insight","nature","deception","perception"], skillCount:2,
+      caster:"int", manaPerLevel:3,
+      desc:"A scholar of the arcane who bends raw magic into fire and force.",
+      features:{
+        1:["Spellcasting (INT). Knows 4 spells of tier 1."],
+        2:["Learn 1 new spell. Arcane Recovery: once per day, regain half your mana."],
+        3:["Learn 1 new spell (tier 2 unlocked)."],
+        4:["Ability Boost: +2 to one ability score (max 20). Learn 1 new spell."],
+        5:["Learn 1 new spell (tier 3 unlocked). Empowered Casting: +1 damage die on damaging spells."]},
+      kit:{weapons:["staff","dagger"], armor:[], shieldOption:false},
+      spellList:["firebolt","magicmissile","shield_sp","sleep","burninghands","mistystep","fireball","frostlance","arcaneeye","levitate"],
+    },
+    cleric:{ name:"Cleric", emoji:"🧑‍⚕️", hitDie:8, primary:"wis",
+      saves:["wis","cha"], skillChoices:["insight","persuasion","perception","nature","intimidation"], skillCount:2,
+      caster:"wis", manaPerLevel:3,
+      desc:"A divine champion who mends wounds and smites the unholy.",
+      features:{
+        1:["Spellcasting (WIS). Knows 4 spells of tier 1."],
+        2:["Learn 1 new spell. Turn Undead: once per combat, frighten undead within 6 squares (WIS save)."],
+        3:["Learn 1 new spell (tier 2 unlocked)."],
+        4:["Ability Boost: +2 to one ability score (max 20). Learn 1 new spell."],
+        5:["Learn 1 new spell (tier 3 unlocked). Blessed Healer: your healing spells restore +2 HP."]},
+      kit:{weapons:["mace","warhammer"], armor:["chainmail","leather"], shieldOption:true},
+      spellList:["sacredflame","cureWounds","bless","shieldoffaith","holdperson","spiritweapon","massheal","guidance","revivify","daylight"],
+    },
+    ranger:{ name:"Ranger", emoji:"🏹", hitDie:10, primary:"dex",
+      saves:["str","dex"], skillChoices:["survival","nature","stealth","perception","athletics","insight"], skillCount:3,
+      caster:"wis", manaPerLevel:2,
+      desc:"A wilderness hunter, deadly with a bow and wise in beast and briar.",
+      features:{
+        1:["Hunter's Eye: +2 damage with ranged weapon attacks.","Tracker: advantage on Survival checks to track."],
+        2:["Spellcasting (WIS). Knows 2 spells of tier 1."],
+        3:["Learn 1 new spell. Skirmisher: moving through difficult terrain costs no extra movement."],
+        4:["Ability Boost: +2 to one ability score (max 20)."],
+        5:["Extra Attack: when you take the Attack action, attack twice. Learn 1 new spell (tier 2 unlocked)."]},
+      kit:{weapons:["bow","shortsword","spear"], armor:["leather","hide"], shieldOption:false},
+      spellList:["huntersmark","cureWounds","entangle","hail_of_thorns","pass_without_trace","lightning_arrow"],
+    },
+    bard:{ name:"Bard", emoji:"🪕", hitDie:8, primary:"cha",
+      saves:["dex","cha"], skillChoices:["performance","persuasion","deception","insight","acrobatics","perception","stealth"], skillCount:3,
+      caster:"cha", manaPerLevel:3,
+      desc:"A silver-tongued performer whose songs carry real magic.",
+      features:{
+        1:["Spellcasting (CHA). Knows 4 spells of tier 1.","Bardic Inspiration: 3/day, quick action to give an ally +1d6 on their next roll."],
+        2:["Learn 1 new spell. Jack of All Trades: +1 to all skill checks you're not proficient in."],
+        3:["Learn 1 new spell (tier 2 unlocked)."],
+        4:["Ability Boost: +2 to one ability score (max 20). Learn 1 new spell."],
+        5:["Learn 1 new spell (tier 3 unlocked). Inspiring Word: Bardic Inspiration also heals 1d6."]},
+      kit:{weapons:["rapier","dagger"], armor:["leather"], shieldOption:false},
+      spellList:["vicious_mockery","charmperson","healingword","thunderwave","invisibility_sp","shatter","hypnotic_pattern","dissonantwhispers","suggestion_sp","heroism"],
+    },
+  },
+
+  /* Spells: range in squares (0=self, 1=touch/melee). shape: single|sphere|cone|line|self|allies.
+     kind: attack (spell attack vs AC) | save (target saves vs caster DC) | auto (no roll) */
+  spells: {
+    firebolt:{name:"Firebolt", tier:1, cost:1, range:12, shape:"single", kind:"attack", damage:"1d10", dmgType:"fire", desc:"Hurl a mote of fire at one target."},
+    magicmissile:{name:"Magic Missile", tier:1, cost:1, range:12, shape:"single", kind:"auto", damage:"2d4+2", dmgType:"force", desc:"Darts of force that never miss."},
+    shield_sp:{name:"Shield", tier:1, cost:1, range:0, shape:"self", kind:"auto", effect:{condition:"shielded"}, desc:"+3 AC until your next turn (cast as a reaction/quick)."},
+    sleep:{name:"Sleep", tier:1, cost:1, range:9, shape:"sphere", radius:2, kind:"save", save:"wis", effect:{condition:"stunned"}, desc:"Creatures in the area must save or fall unconscious (stunned 1 round)."},
+    burninghands:{name:"Burning Hands", tier:1, cost:1, range:0, shape:"cone", radius:3, kind:"save", save:"dex", damage:"3d6", dmgType:"fire", half:true, desc:"A fan of flame; DEX save for half."},
+    mistystep:{name:"Misty Step", tier:2, cost:2, range:6, shape:"self", kind:"auto", effect:{teleport:true}, desc:"Teleport up to 6 squares to a spot you can see."},
+    fireball:{name:"Fireball", tier:3, cost:3, range:14, shape:"sphere", radius:3, kind:"save", save:"dex", damage:"6d6", dmgType:"fire", half:true, desc:"An explosion of flame; DEX save for half."},
+    frostlance:{name:"Frost Lance", tier:2, cost:2, range:10, shape:"single", kind:"attack", damage:"3d8", dmgType:"cold", effect:{condition:"slowed"}, desc:"A spear of ice; on hit the target is slowed."},
+    arcaneeye:{name:"Arcane Eye", tier:2, cost:2, range:0, shape:"self", kind:"auto", effect:{reveal:8}, desc:"Scout unseen — reveals the area around you (radius 8)."},
+    levitate:{name:"Levitate", tier:2, cost:2, range:8, shape:"single", kind:"save", save:"con", effect:{condition:"restrained"}, desc:"Lift a creature helplessly into the air (restrained)."},
+    sacredflame:{name:"Sacred Flame", tier:1, cost:1, range:10, shape:"single", kind:"save", save:"dex", damage:"1d8", dmgType:"radiant", desc:"Holy radiance descends on a foe."},
+    cureWounds:{name:"Cure Wounds", tier:1, cost:1, range:1, shape:"single", kind:"auto", heal:"1d8+3", desc:"Mend wounds with a touch."},
+    bless:{name:"Bless", tier:1, cost:1, range:6, shape:"single", kind:"auto", effect:{condition:"blessed"}, desc:"Target gains +1d4 on attacks and saves (blessed)."},
+    shieldoffaith:{name:"Shield of Faith", tier:1, cost:1, range:6, shape:"single", kind:"auto", effect:{condition:"shielded"}, desc:"A shimmering ward grants +2 AC."},
+    holdperson:{name:"Hold Person", tier:2, cost:2, range:8, shape:"single", kind:"save", save:"wis", effect:{condition:"stunned"}, desc:"Paralyze a humanoid (stunned; save each round)."},
+    spiritweapon:{name:"Spirit Weapon", tier:2, cost:2, range:8, shape:"single", kind:"attack", damage:"2d8", dmgType:"radiant", desc:"A spectral weapon strikes a foe."},
+    massheal:{name:"Healing Circle", tier:3, cost:3, range:8, shape:"sphere", radius:2, kind:"auto", heal:"2d8+3", allies:true, desc:"Heal all allies in the area."},
+    guidance:{name:"Guidance", tier:1, cost:1, range:1, shape:"single", kind:"auto", effect:{condition:"blessed"}, desc:"Divine insight aids the target's next efforts."},
+    revivify:{name:"Revivify", tier:3, cost:3, range:1, shape:"single", kind:"auto", heal:"1", revive:true, desc:"Return a creature that died this combat to life at 1 HP."},
+    daylight:{name:"Daylight", tier:2, cost:2, range:0, shape:"self", kind:"auto", effect:{reveal:10}, desc:"Brilliant light floods the area (reveals radius 10)."},
+    huntersmark:{name:"Hunter's Mark", tier:1, cost:1, range:10, shape:"single", kind:"auto", effect:{condition:"marked"}, desc:"Mark quarry: your weapon attacks against it deal +1d6."},
+    entangle:{name:"Entangle", tier:1, cost:1, range:8, shape:"sphere", radius:2, kind:"save", save:"str", effect:{condition:"restrained"}, desc:"Grasping vines erupt; STR save or be restrained."},
+    hail_of_thorns:{name:"Hail of Thorns", tier:1, cost:1, range:10, shape:"sphere", radius:1, kind:"save", save:"dex", damage:"2d10", dmgType:"piercing", half:true, desc:"A rain of thorns bursts over the area."},
+    pass_without_trace:{name:"Pass Without Trace", tier:2, cost:2, range:0, shape:"self", kind:"auto", effect:{condition:"invisible"}, desc:"You and nearby allies become ghost-quiet (advantage on Stealth)."},
+    lightning_arrow:{name:"Lightning Arrow", tier:2, cost:2, range:12, shape:"single", kind:"attack", damage:"4d8", dmgType:"lightning", desc:"Your arrow becomes a bolt of lightning."},
+    vicious_mockery:{name:"Vicious Mockery", tier:1, cost:1, range:10, shape:"single", kind:"save", save:"wis", damage:"1d6", dmgType:"psychic", effect:{condition:"mocked"}, desc:"Insults laced with magic; target has disadvantage on its next attack."},
+    charmperson:{name:"Charm Person", tier:1, cost:1, range:8, shape:"single", kind:"save", save:"wis", effect:{condition:"charmed"}, desc:"A humanoid regards you as a friend."},
+    healingword:{name:"Healing Word", tier:1, cost:1, range:10, shape:"single", kind:"auto", heal:"1d4+3", desc:"A word of power knits wounds at range (quick action)."},
+    thunderwave:{name:"Thunderwave", tier:1, cost:1, range:0, shape:"sphere", radius:2, kind:"save", save:"con", damage:"2d8", dmgType:"thunder", half:true, desc:"A wave of force booms out from you."},
+    invisibility_sp:{name:"Invisibility", tier:2, cost:2, range:1, shape:"single", kind:"auto", effect:{condition:"invisible"}, desc:"A creature you touch vanishes from sight."},
+    shatter:{name:"Shatter", tier:2, cost:2, range:10, shape:"sphere", radius:2, kind:"save", save:"con", damage:"3d8", dmgType:"thunder", half:true, desc:"A ringing crack of destructive resonance."},
+    hypnotic_pattern:{name:"Hypnotic Pattern", tier:3, cost:3, range:10, shape:"sphere", radius:3, kind:"save", save:"wis", effect:{condition:"charmed"}, desc:"Twisting colors fascinate creatures in the area."},
+    dissonantwhispers:{name:"Dissonant Whispers", tier:1, cost:1, range:10, shape:"single", kind:"save", save:"wis", damage:"3d6", dmgType:"psychic", half:true, desc:"A discordant melody wracks the target's mind."},
+    suggestion_sp:{name:"Suggestion", tier:2, cost:2, range:8, shape:"single", kind:"save", save:"wis", effect:{condition:"charmed"}, desc:"Magically compel a reasonable-sounding course of action."},
+    heroism:{name:"Heroism", tier:1, cost:1, range:1, shape:"single", kind:"auto", effect:{condition:"blessed"}, heal:"3", desc:"Imbue an ally with courage and temporary vigor."},
+  },
+
+  conditions: {
+    prone:{emoji:"🔻", desc:"Attackers within 1 square have advantage; your attacks have disadvantage. Half movement to stand."},
+    poisoned:{emoji:"🤢", desc:"Disadvantage on attack rolls and ability checks."},
+    stunned:{emoji:"💫", desc:"Can't move or act. Attacks against you have advantage."},
+    restrained:{emoji:"🕸", desc:"Speed 0. Attacks against you have advantage; yours have disadvantage."},
+    frightened:{emoji:"😱", desc:"Disadvantage while the source of fear is visible; can't move closer to it."},
+    invisible:{emoji:"👻", desc:"Attacks against you have disadvantage; your attacks have advantage."},
+    blessed:{emoji:"✨", desc:"+1d4 to attack rolls and saving throws."},
+    shielded:{emoji:"🛡", desc:"+2 AC."},
+    slowed:{emoji:"🐌", desc:"Half movement speed."},
+    marked:{emoji:"🎯", desc:"The marker's weapon attacks against you deal +1d6."},
+    charmed:{emoji:"💕", desc:"Can't attack the charmer; the charmer has advantage on social checks."},
+    mocked:{emoji:"🃏", desc:"Disadvantage on your next attack roll."},
+  },
+
+  weapons: {
+    dagger:{name:"Dagger", emoji:"🔪", dmg:"1d4", ab:"dex", range:1, thrown:4, cost:2},
+    shortsword:{name:"Shortsword", emoji:"🗡", dmg:"1d6", ab:"dex", range:1, cost:10},
+    rapier:{name:"Rapier", emoji:"🤺", dmg:"1d8", ab:"dex", range:1, cost:25},
+    longsword:{name:"Longsword", emoji:"⚔️", dmg:"1d8", ab:"str", range:1, cost:15},
+    greataxe:{name:"Greataxe", emoji:"🪓", dmg:"1d12", ab:"str", range:1, twoHanded:true, cost:30},
+    warhammer:{name:"Warhammer", emoji:"🔨", dmg:"1d8", ab:"str", range:1, cost:15},
+    mace:{name:"Mace", emoji:"🏏", dmg:"1d6", ab:"str", range:1, cost:5},
+    spear:{name:"Spear", emoji:"🔱", dmg:"1d6", ab:"str", range:1, thrown:4, cost:3},
+    staff:{name:"Quarterstaff", emoji:"🪄", dmg:"1d6", ab:"str", range:1, cost:2},
+    bow:{name:"Bow", emoji:"🏹", dmg:"1d8", ab:"dex", range:12, twoHanded:true, cost:25},
+    crossbow:{name:"Crossbow", emoji:"🎯", dmg:"1d10", ab:"dex", range:10, twoHanded:true, cost:35},
+    sling:{name:"Sling", emoji:"🥎", dmg:"1d4", ab:"dex", range:8, cost:1},
+  },
+
+  armors: {
+    none:{name:"No armor", ac:10, dexMax:99, cost:0},
+    leather:{name:"Leather armor", ac:11, dexMax:99, cost:10},
+    hide:{name:"Hide armor", ac:12, dexMax:2, cost:15},
+    chainmail:{name:"Chainmail", ac:14, dexMax:2, cost:50},
+    plate:{name:"Plate armor", ac:16, dexMax:0, cost:400},
+  },
+
+  gear: ["Torch","Rope (50 ft)","Rations (3 days)","Waterskin","Bedroll","Tinderbox","Healing potion (2d4+2)"],
+
+  /* Bestiary — threat ≈ how many level-1 PCs it challenges. mods = ability modifiers. */
+  monsters: {
+    rat:{name:"Giant Rat", emoji:"🐀", threat:0.25, ac:12, hp:7, speed:6, mods:{str:0,dex:2,con:0,wis:0}, attacks:[{name:"Bite", bonus:4, damage:"1d4+2", range:1}], traits:["Pack Tactics: advantage if an ally is adjacent to the target."]},
+    bat_swarm:{name:"Bat Swarm", emoji:"🦇", threat:0.25, ac:12, hp:9, speed:8, mods:{str:-2,dex:3,con:0,wis:1}, attacks:[{name:"Bites", bonus:4, damage:"2d4", range:1}], traits:["Swarm: resistant to weapon damage (half)."]},
+    goblin:{name:"Goblin", emoji:"👺", threat:0.5, ac:13, hp:8, speed:6, mods:{str:-1,dex:2,con:0,wis:-1}, attacks:[{name:"Scimitar", bonus:4, damage:"1d6+2", range:1},{name:"Shortbow", bonus:4, damage:"1d6+2", range:10}], traits:["Nimble Escape: can Disengage or Hide as a quick action."]},
+    kobold:{name:"Kobold", emoji:"🦎", threat:0.25, ac:12, hp:6, speed:6, mods:{str:-2,dex:2,con:-1,wis:-2}, attacks:[{name:"Dagger", bonus:4, damage:"1d4+2", range:1},{name:"Sling", bonus:4, damage:"1d4+2", range:8}], traits:["Pack Tactics: advantage if an ally is adjacent to the target."]},
+    skeleton:{name:"Skeleton", emoji:"💀", threat:0.5, ac:13, hp:13, speed:6, mods:{str:0,dex:2,con:2,wis:-1}, attacks:[{name:"Rusted Sword", bonus:4, damage:"1d6+2", range:1},{name:"Old Bow", bonus:4, damage:"1d6+2", range:10}], traits:["Undead: immune to poison and charm."]},
+    zombie:{name:"Zombie", emoji:"🧟", threat:0.5, ac:8, hp:22, speed:4, mods:{str:1,dex:-2,con:3,wis:-2}, attacks:[{name:"Slam", bonus:3, damage:"1d6+1", range:1}], traits:["Undead Fortitude: first time it drops to 0 HP, it stands back up with 1 HP."]},
+    bandit:{name:"Bandit", emoji:"🥷", threat:0.5, ac:12, hp:11, speed:6, mods:{str:0,dex:1,con:1,wis:0}, attacks:[{name:"Scimitar", bonus:3, damage:"1d6+1", range:1},{name:"Crossbow", bonus:3, damage:"1d8+1", range:10}], traits:[]},
+    cultist:{name:"Cultist", emoji:"🧛", threat:0.5, ac:12, hp:9, speed:6, mods:{str:0,dex:1,con:0,wis:0}, attacks:[{name:"Ritual Dagger", bonus:3, damage:"1d4+1", range:1},{name:"Dark Bolt", bonus:4, damage:"1d8+2", range:8}], traits:["Fanatic: advantage on saves against fear."]},
+    wolf:{name:"Wolf", emoji:"🐺", threat:0.5, ac:13, hp:11, speed:8, mods:{str:1,dex:2,con:1,wis:1}, attacks:[{name:"Bite", bonus:4, damage:"2d4+2", range:1}], traits:["Pack Tactics: advantage if an ally is adjacent to the target.","On a hit, target must pass a STR save (DC 11) or be knocked prone."]},
+    giant_spider:{name:"Giant Spider", emoji:"🕷", threat:1, ac:14, hp:26, speed:6, mods:{str:2,dex:3,con:1,wis:0}, attacks:[{name:"Venomous Bite", bonus:5, damage:"1d8+3", range:1},{name:"Web", bonus:5, damage:"0", range:8, effect:"restrained"}], traits:["Web Walker: ignores difficult terrain from webs.","Bite: CON save DC 11 or take 2d4 extra poison damage."]},
+    orc_raider:{name:"Orc Raider", emoji:"🧌", threat:1, ac:13, hp:15, speed:6, mods:{str:3,dex:1,con:3,wis:0}, attacks:[{name:"Greataxe", bonus:5, damage:"1d12+3", range:1},{name:"Javelin", bonus:5, damage:"1d6+3", range:6}], traits:["Aggressive: can Dash toward an enemy as a quick action."]},
+    hobgoblin:{name:"Hobgoblin", emoji:"👹", threat:1, ac:15, hp:16, speed:6, mods:{str:1,dex:1,con:1,wis:0}, attacks:[{name:"Longsword", bonus:3, damage:"1d8+1", range:1},{name:"Longbow", bonus:3, damage:"1d8+1", range:12}], traits:["Martial Advantage: +2d6 damage if an ally is adjacent to the target."]},
+    ghoul:{name:"Ghoul", emoji:"🧟‍♂️", threat:1, ac:12, hp:22, speed:6, mods:{str:1,dex:2,con:0,wis:0}, attacks:[{name:"Claws", bonus:4, damage:"2d4+2", range:1, effect:"stunned"}], traits:["Paralyzing Claws: on hit, CON save DC 10 or be stunned 1 round.","Undead: immune to poison and charm."]},
+    animated_armor:{name:"Animated Armor", emoji:"🛡", threat:1, ac:17, hp:24, speed:5, mods:{str:2,dex:0,con:1,wis:-2}, attacks:[{name:"Slam", bonus:4, damage:"1d6+2", range:1}], traits:["Construct: immune to poison, charm, and fear."]},
+    bandit_captain:{name:"Bandit Captain", emoji:"🏴‍☠️", threat:2, ac:15, hp:39, speed:6, mods:{str:2,dex:3,con:2,wis:0}, attacks:[{name:"Scimitar (x2)", bonus:5, damage:"1d6+3", range:1, multi:2},{name:"Dagger", bonus:5, damage:"1d4+3", range:4}], traits:["Parry: +2 AC against one melee attack per round."]},
+    dire_wolf:{name:"Dire Wolf", emoji:"🐺", threat:1.5, ac:14, hp:30, speed:9, mods:{str:3,dex:2,con:2,wis:1}, attacks:[{name:"Bite", bonus:5, damage:"2d6+3", range:1}], traits:["Pack Tactics.","On a hit, target must pass a STR save (DC 13) or be knocked prone."]},
+    ogre:{name:"Ogre", emoji:"👹", threat:2, ac:11, hp:44, speed:8, mods:{str:4,dex:-1,con:3,wis:-1}, attacks:[{name:"Greatclub", bonus:6, damage:"2d8+4", range:1},{name:"Hurled Rock", bonus:6, damage:"2d6+4", range:8}], traits:["Brute: melee attacks knock targets back 1 square."]},
+    wight:{name:"Wight", emoji:"🧞", threat:2, ac:14, hp:33, speed:6, mods:{str:2,dex:2,con:3,wis:1}, attacks:[{name:"Life Drain", bonus:4, damage:"1d6+2", range:1, effect:"drain"},{name:"Longsword", bonus:4, damage:"1d8+2", range:1}], traits:["Life Drain heals the wight for half damage dealt.","Undead: immune to poison and charm."]},
+    cult_priest:{name:"Cult Priest", emoji:"🧙‍♀️", threat:2, ac:13, hp:27, speed:6, mods:{str:0,dex:1,con:1,wis:3}, attacks:[{name:"Shadow Lash", bonus:5, damage:"2d6+3", range:8},{name:"Dagger", bonus:3, damage:"1d4+1", range:1}], traits:["Dark Blessing: allies within 4 squares get +1 to attack rolls.","Can cast Hold Person (DC 13) once per combat."]},
+    troll:{name:"Troll", emoji:"🧌", threat:3, ac:14, hp:63, speed:7, mods:{str:4,dex:1,con:4,wis:0}, attacks:[{name:"Claws (x2)", bonus:7, damage:"2d6+4", range:1, multi:2},{name:"Bite", bonus:7, damage:"1d6+4", range:1}], traits:["Regeneration: regains 5 HP at the start of its turn unless it took fire damage last round."]},
+    stone_golem:{name:"Stone Golem", emoji:"🗿", threat:3, ac:17, hp:66, speed:5, mods:{str:5,dex:-1,con:4,wis:0}, attacks:[{name:"Fists (x2)", bonus:8, damage:"2d8+5", range:1, multi:2}], traits:["Construct: immune to poison, charm, and fear.","Slow Aura: enemies starting adjacent are slowed."]},
+    wyvern:{name:"Wyvern", emoji:"🐉", threat:3, ac:13, hp:68, speed:8, mods:{str:4,dex:0,con:3,wis:1}, attacks:[{name:"Bite", bonus:7, damage:"2d6+4", range:1},{name:"Stinger", bonus:7, damage:"2d6+4", range:1, effect:"poisoned"}], traits:["Flyby: can move over enemies without provoking.","Stinger: CON save DC 14 or take 3d6 extra poison damage."]},
+    necromancer:{name:"Necromancer", emoji:"🧟‍♀️", threat:3, ac:12, hp:40, speed:6, mods:{str:-1,dex:1,con:1,wis:2}, attacks:[{name:"Grave Bolt", bonus:6, damage:"3d8+2", range:10},{name:"Chill Touch", bonus:6, damage:"2d6+2", range:1}], traits:["Raise Dead: once per combat, animates 2 skeletons in empty adjacent squares.","Shroud of Souls: first attack against it each round has disadvantage."]},
+    young_dragon:{name:"Young Dragon", emoji:"🐲", threat:4, ac:17, hp:93, speed:10, mods:{str:5,dex:2,con:4,wis:1}, attacks:[{name:"Bite", bonus:8, damage:"2d10+5", range:1},{name:"Claws (x2)", bonus:8, damage:"2d6+5", range:1, multi:2},{name:"Fire Breath", bonus:0, damage:"8d6", range:0, cone:5, save:"dex", dc:15}], traits:["Fire Breath (recharge 5–6): 5-square cone, DEX save DC 15 for half.","Frightful Presence: enemies first seeing it must pass a WIS save DC 14 or be frightened."]},
+    lich_acolyte:{name:"Lich Acolyte", emoji:"☠️", threat:4, ac:15, hp:80, speed:6, mods:{str:0,dex:2,con:3,wis:3}, attacks:[{name:"Ray of Rot", bonus:8, damage:"3d10+3", range:12},{name:"Paralyzing Touch", bonus:8, damage:"2d6+3", range:1, effect:"stunned"}], traits:["Undead: immune to poison and charm.","Ward of Bone: once per combat, negate one attack that would hit it."]},
+  },
+
+  emojiChoices:["🧑","👩","🧔","🧝","🧝‍♀️","🧙","🧙‍♀️","🧒","👧","🧌","🐲","🥷","🏹","⚔️","🛡","🗡","🪕","🧑‍⚕️","👸","🤴","🧛","🐺","🦊","🐻"],
+};
+
+const ABILITY_MOD = s => Math.floor((s - 10) / 2);
+const fmtMod = m => (m >= 0 ? "+" + m : String(m));
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+const uid = () => Math.random().toString(36).slice(2, 10);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function() {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hashSeed(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+/* ============================================================
+   DICE ENGINE
+   ============================================================ */
+const Dice = {
+  // Parse expressions like "2d6+3", "d20", "4d6kh3" (keep highest 3), "1d20adv", "1d20dis"
+  roll(expr, opts = {}) {
+    const cleaned = String(expr).toLowerCase().replace(/\s+/g, "");
+    let adv = opts.adv || /adv$/.test(cleaned);
+    let dis = opts.dis || /dis$/.test(cleaned);
+    const core = cleaned.replace(/(adv|dis)$/, "");
+    const parts = core.match(/^([+-]?\d*d\d+(?:kh\d+)?|[+-]?\d+)((?:[+-]\d*d\d+(?:kh\d+)?|[+-]\d+)*)$/);
+    if (!parts) return null;
+    const tokens = (core.match(/[+-]?\d*d\d+(?:kh\d+)?|[+-]?\d+/g)) || [];
+    let total = 0; const detail = []; let d20 = null;
+    for (const tok of tokens) {
+      const sign = tok.startsWith("-") ? -1 : 1;
+      const t = tok.replace(/^[+-]/, "");
+      if (t.includes("d")) {
+        let [nStr, rest] = t.split("d");
+        let n = parseInt(nStr || "1", 10);
+        let keep = null, faces;
+        if (rest.includes("kh")) { const [f, k] = rest.split("kh"); faces = parseInt(f, 10); keep = parseInt(k, 10); }
+        else faces = parseInt(rest, 10);
+        if (!faces || n > 100) return null;
+        // advantage/disadvantage applies to single d20 rolls
+        if (faces === 20 && n === 1 && (adv || dis)) {
+          const r1 = 1 + Math.floor(Math.random() * 20), r2 = 1 + Math.floor(Math.random() * 20);
+          const pick = adv ? Math.max(r1, r2) : Math.min(r1, r2);
+          detail.push(`d20(${adv ? "adv" : "dis"}:${r1},${r2}→${pick})`);
+          total += sign * pick; d20 = pick;
+        } else {
+          const rolls = [];
+          for (let i = 0; i < n; i++) rolls.push(1 + Math.floor(Math.random() * faces));
+          let used = rolls;
+          if (keep) used = [...rolls].sort((a, b) => b - a).slice(0, keep);
+          const sum = used.reduce((a, b) => a + b, 0);
+          detail.push(`${n}d${faces}${keep ? "kh" + keep : ""}(${rolls.join(",")})`);
+          total += sign * sum;
+          if (faces === 20 && n === 1) d20 = rolls[0];
+        }
+      } else {
+        total += sign * parseInt(t, 10);
+        detail.push(tok.startsWith("-") ? tok : (detail.length ? "+" + t : t));
+      }
+    }
+    return { total, detail: detail.join(" "), d20, crit: d20 === 20, fumble: d20 === 1 };
+  },
+
+  // Roll and post to the chat log. who = display name
+  post(expr, { who = "Dice", reason = "", adv = false, dis = false, vs = null } = {}) {
+    const r = this.roll(expr, { adv, dis });
+    if (!r) { Chat.system(`Could not parse dice expression "${esc(expr)}"`); return null; }
+    let outcome = "";
+    if (vs != null) outcome = r.total >= vs ? " — <span class='crit'>success</span>" : " — <span class='fumble'>failure</span>";
+    let critTag = r.crit ? " <span class='crit'>CRIT!</span>" : r.fumble ? " <span class='fumble'>natural 1</span>" : "";
+    Chat.add({ type: "roll", html:
+      `<span class="who">🎲 ${esc(who)}${reason ? " — " + esc(reason) : ""}${vs != null ? " (DC " + vs + ")" : ""}</span>` +
+      `<b>${r.total}</b> <span style="opacity:.75">⟵ ${esc(expr)} ${esc(r.detail)}</span>${critTag}${outcome}` });
+    return r;
+  },
+};
+
+/* ============================================================
+   GAME STATE
+   ============================================================ */
+const TERRAIN = {
+  VOID:   {id:0, name:"Void",      color:"#15100b", pass:false},
+  FLOOR:  {id:1, name:"Floor",     color:"#8a7a5c", pass:true},
+  WALL:   {id:2, name:"Wall",      color:"#3a2d20", pass:false},
+  DOOR:   {id:3, name:"Door",      color:"#7a5226", pass:true},
+  WATER:  {id:4, name:"Water",     color:"#3b6b8a", pass:true, cost:2},
+  LAVA:   {id:5, name:"Lava",      color:"#b5451f", pass:true, cost:2, hazard:"2d6 fire"},
+  ROUGH:  {id:6, name:"Difficult", color:"#6e6248", pass:true, cost:2},
+  GRASS:  {id:7, name:"Grass",     color:"#5d7a44", pass:true},
+};
+const TERRAIN_BY_ID = Object.values(TERRAIN).reduce((m, t) => (m[t.id] = t, m), {});
+
+function blankMap(w = 30, h = 22, fill = TERRAIN.GRASS.id) {
+  return { name: "Untitled", w, h,
+    terrain: new Array(w * h).fill(fill),
+    fog: new Array(w * h).fill(false) };  // fog[i]=true means hidden
+}
+
+const State = {
+  data: null,
+  fresh() {
+    return {
+      version: 1,
+      party: [],
+      map: blankMap(),
+      mapLibrary: {},               // id -> {name, w, h, terrain, fog}
+      tokens: [],                   // see Tokens
+      combat: { active: false, order: [], turn: 0, round: 0, moved: 0, actionUsed: false, quickUsed: false },
+      quest: { title: "", premise: "", log: [] },
+      chat: [],
+      dmMessages: [],               // Claude API conversation history
+      settings: { apiKey: "", model: "claude-opus-4-8", autonomy: "codm", mock: false },
+    };
+  },
+  load() {
+    try {
+      const raw = localStorage.getItem("fableboard_save");
+      if (raw) { this.data = JSON.parse(raw); return true; }
+    } catch (e) { console.warn("load failed", e); }
+    this.data = this.fresh(); return false;
+  },
+  save() {
+    try { localStorage.setItem("fableboard_save", JSON.stringify(this.data)); }
+    catch (e) { console.warn("save failed", e); }
+  },
+  export() {
+    const blob = new Blob([JSON.stringify(this.data, null, 1)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "fableboard-campaign.json";
+    a.click(); URL.revokeObjectURL(a.href);
+  },
+  import(json) {
+    const d = JSON.parse(json);
+    if (!d || d.version !== 1 || !d.map) throw new Error("Not a Fableboard campaign file");
+    this.data = d; this.save();
+    App.renderAll(); Chat.system("Campaign imported.");
+  },
+};
+let S = null; // live alias to State.data, set in App.init
+
+const saveSoon = (() => { let t = null; return () => { clearTimeout(t); t = setTimeout(() => State.save(), 800); }; })();
+
+/* ============================================================
+   TOKENS
+   ============================================================ */
+const Tokens = {
+  create({ name, emoji = "❓", team = "neutral", x = 0, y = 0, hp = 10, maxHp = null, ac = 10, speed = 6, charId = null, monsterId = null }) {
+    // unique display name
+    let base = name, n = 1, finalName = base;
+    while (S.tokens.some(t => t.name.toLowerCase() === finalName.toLowerCase())) finalName = `${base} ${++n}`;
+    const tok = { id: uid(), name: finalName, emoji, team, x, y, hp, maxHp: maxHp ?? hp, ac, speed,
+      charId, monsterId, conditions: [], init: null, dead: false,
+      usedTraits: {} };
+    S.tokens.push(tok);
+    return tok;
+  },
+  get(id) { return S.tokens.find(t => t.id === id); },
+  byName(name) {
+    const n = String(name).toLowerCase().trim();
+    return S.tokens.find(t => t.name.toLowerCase() === n) ||
+           S.tokens.find(t => t.name.toLowerCase().startsWith(n)) ||
+           S.tokens.find(t => t.name.toLowerCase().includes(n));
+  },
+  forChar(c) { return S.tokens.find(t => t.charId === c.id); },
+  remove(id) {
+    S.tokens = S.tokens.filter(t => t.id !== id);
+    if (S.combat.active) S.combat.order = S.combat.order.filter(i => i !== id);
+  },
+  findOpenCell(x, y) {
+    // nearest passable, unoccupied cell to (x,y)
+    const occ = new Set(S.tokens.map(t => t.x + "," + t.y));
+    for (let r = 0; r < 12; r++) {
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const cx = x + dx, cy = y + dy;
+        if (cx < 0 || cy < 0 || cx >= S.map.w || cy >= S.map.h) continue;
+        const t = TERRAIN_BY_ID[S.map.terrain[cy * S.map.w + cx]];
+        if (t.pass && !occ.has(cx + "," + cy)) return { x: cx, y: cy };
+      }
+    }
+    return { x, y };
+  },
+  spawnCharacter(c, x = null, y = null) {
+    const existing = this.forChar(c);
+    if (existing) return existing;
+    let pos = { x: x ?? Math.floor(S.map.w / 2), y: y ?? Math.floor(S.map.h / 2) };
+    pos = this.findOpenCell(pos.x, pos.y);
+    const tok = this.create({ name: c.name, emoji: c.emoji, team: "party", x: pos.x, y: pos.y,
+      hp: c.hp, maxHp: c.maxHp, ac: Characters.ac(c), speed: c.speed, charId: c.id });
+    Board.revealAround(tok.x, tok.y, 6);
+    return tok;
+  },
+  applyDamage(tok, amount, type = "") {
+    amount = Math.max(0, Math.round(amount));
+    tok.hp = Math.max(0, tok.hp - amount);
+    const c = tok.charId ? Characters.get(tok.charId) : null;
+    if (c) c.hp = tok.hp;
+    Chat.system(`${tok.emoji} <b>${esc(tok.name)}</b> takes <b>${amount}</b> ${esc(type)} damage${tok.hp === 0 ? " and falls!" : ` (${tok.hp}/${tok.maxHp} HP)`}`);
+    if (tok.hp === 0) this.down(tok);
+    App.renderAll();
+  },
+  heal(tok, amount) {
+    amount = Math.max(0, Math.round(amount));
+    const was = tok.hp;
+    tok.hp = Math.min(tok.maxHp, tok.hp + amount);
+    if (tok.dead && tok.hp > 0) tok.dead = false;
+    const c = tok.charId ? Characters.get(tok.charId) : null;
+    if (c) c.hp = tok.hp;
+    Chat.system(`${tok.emoji} <b>${esc(tok.name)}</b> heals <b>${tok.hp - was}</b> HP (${tok.hp}/${tok.maxHp})`);
+    App.renderAll();
+  },
+  down(tok) {
+    if (tok.team === "party") {
+      tok.dead = false; // downed, not gone — heroes can be healed back up
+      Chat.system(`💔 <b>${esc(tok.name)}</b> is down and dying! Heal them quickly.`);
+    } else {
+      tok.dead = true;
+      Chat.system(`☠️ <b>${esc(tok.name)}</b> is slain.`);
+      if (S.combat.active) Combat.checkVictory();
+    }
+  },
+  setCondition(tok, cond, active = true) {
+    cond = String(cond).toLowerCase();
+    if (!RULES.conditions[cond]) return false;
+    if (active && !tok.conditions.includes(cond)) tok.conditions.push(cond);
+    if (!active) tok.conditions = tok.conditions.filter(c => c !== cond);
+    Chat.system(`${tok.emoji} <b>${esc(tok.name)}</b> is ${active ? "now" : "no longer"} <b>${cond}</b> ${RULES.conditions[cond].emoji}`);
+    App.renderAll();
+    return true;
+  },
+};
+
+/* ============================================================
+   CHAT / STORY LOG
+   ============================================================ */
+const Chat = {
+  el: null,
+  init() { this.el = $("#chatlog"); this.renderAll(); },
+  add(msg) {
+    msg.t = Date.now();
+    S.chat.push(msg);
+    if (S.chat.length > 400) S.chat = S.chat.slice(-350);
+    this.renderOne(msg);
+    saveSoon();
+  },
+  dm(text) { this.add({ type: "dm", text }); },
+  player(text) { this.add({ type: "player", text }); },
+  system(html) { this.add({ type: "system", html }); },
+  error(html) { this.add({ type: "error", html }); },
+  renderOne(msg) {
+    const d = document.createElement("div");
+    if (msg.type === "dm") {
+      d.className = "msg msg-dm";
+      d.innerHTML = `<span class="who">🎩 Dungeon Master</span>` + this.mdLite(msg.text);
+    } else if (msg.type === "player") {
+      d.className = "msg msg-player";
+      d.innerHTML = `<span class="who">🛡 You</span>` + esc(msg.text).replace(/\n/g, "<br>");
+    } else if (msg.type === "roll") {
+      d.className = "msg msg-roll"; d.innerHTML = msg.html;
+    } else if (msg.type === "error") {
+      d.className = "msg msg-error"; d.innerHTML = "⚠️ " + msg.html;
+    } else if (msg.type === "toolcard") {
+      d.className = "toolcard resolved";
+      d.innerHTML = `<span class="tc-name">🛠 ${esc(msg.tool)}</span><div class="tc-detail">${esc(msg.detail || "")}</div><div class="tc-status">${esc(msg.status || "")}</div>`;
+    } else {
+      d.className = "msg msg-system"; d.innerHTML = msg.html || esc(msg.text || "");
+    }
+    this.el.appendChild(d);
+    this.el.scrollTop = this.el.scrollHeight;
+    return d;
+  },
+  renderAll() {
+    this.el.innerHTML = "";
+    for (const m of S.chat) this.renderOne(m);
+  },
+  // minimal markdown: **bold**, *italic*, paragraphs
+  mdLite(text) {
+    return esc(text)
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      .split(/\n{2,}/).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+  },
+};
+
+/* ============================================================
+   BOARD — canvas rendering & interaction
+   ============================================================ */
+const Board = {
+  canvas: null, ctx: null,
+  cell: 34, zoom: 1, panX: 0, panY: 0,
+  hoverCell: null, selected: null,   // selected token id
+  dragToken: null, panning: false, lastMouse: null,
+  showFog: true,
+  measureFrom: null, measureMode: false,
+  targeting: null, // {type:'attack'|'spell'|'move'|'place', data, cb}
+  moveRange: null, // Map "x,y" -> cost for current turn token
+
+  init() {
+    this.canvas = $("#board");
+    this.ctx = this.canvas.getContext("2d");
+    const ro = new ResizeObserver(() => this.resize());
+    ro.observe(this.canvas.parentElement);
+    this.resize();
+    this.center();
+
+    const cv = this.canvas;
+    cv.addEventListener("mousedown", e => this.onDown(e));
+    window.addEventListener("mousemove", e => this.onMove(e));
+    window.addEventListener("mouseup", e => this.onUp(e));
+    cv.addEventListener("wheel", e => { e.preventDefault(); this.onWheel(e); }, { passive: false });
+    cv.addEventListener("contextmenu", e => e.preventDefault());
+    cv.addEventListener("dblclick", e => this.onDbl(e));
+  },
+  resize() {
+    const r = this.canvas.parentElement.getBoundingClientRect();
+    this.canvas.width = r.width * devicePixelRatio;
+    this.canvas.height = r.height * devicePixelRatio;
+    this.canvas.style.width = r.width + "px";
+    this.canvas.style.height = r.height + "px";
+    this.draw();
+  },
+  center() {
+    const r = this.canvas.getBoundingClientRect();
+    this.panX = (r.width - S.map.w * this.cell * this.zoom) / 2;
+    this.panY = (r.height - S.map.h * this.cell * this.zoom) / 2;
+    this.draw();
+  },
+  toCell(px, py) {
+    const r = this.canvas.getBoundingClientRect();
+    const x = Math.floor((px - r.left - this.panX) / (this.cell * this.zoom));
+    const y = Math.floor((py - r.top - this.panY) / (this.cell * this.zoom));
+    return { x, y, inside: x >= 0 && y >= 0 && x < S.map.w && y < S.map.h };
+  },
+  tokenAt(x, y) { return S.tokens.find(t => t.x === x && t.y === y && !t.dead) || S.tokens.find(t => t.x === x && t.y === y); },
+
+  /* ---------- interaction ---------- */
+  onDown(e) {
+    const c = this.toCell(e.clientX, e.clientY);
+    this.lastMouse = { x: e.clientX, y: e.clientY };
+
+    if (App.mode === "edit") {
+      if (e.button === 0 && c.inside) { Editor.paintAt(c.x, c.y, e.shiftKey); Editor.painting = true; return; }
+      if (e.button === 1 || e.button === 2 || !c.inside) { this.panning = true; return; }
+      return;
+    }
+    // play mode
+    if (e.button === 2 || e.button === 1) { this.panning = true; return; }
+    if (!c.inside) { this.panning = true; return; }
+
+    if (this.measureMode) {
+      this.measureFrom = this.measureFrom ? null : { x: c.x, y: c.y };
+      this.draw(); return;
+    }
+    if (this.targeting) { this.resolveTarget(c); return; }
+
+    const tok = this.tokenAt(c.x, c.y);
+    if (tok) {
+      this.selected = tok.id;
+      // drag own tokens (or any token out of combat)
+      const draggable = !S.combat.active || Combat.currentToken()?.id === tok.id || tok.team === "party";
+      if (draggable) this.dragToken = { id: tok.id, ox: tok.x, oy: tok.y };
+      this.computeMoveRange();
+      App.renderCombat();
+      this.draw();
+    } else if (this.selected && this.moveRange && this.moveRange.has(c.x + "," + c.y)) {
+      // click-to-move within range
+      this.moveSelectedTo(c.x, c.y);
+    } else {
+      this.selected = null; this.moveRange = null; this.panning = true;
+      App.renderCombat(); this.draw();
+    }
+  },
+  onMove(e) {
+    if (this.panning && this.lastMouse) {
+      this.panX += e.clientX - this.lastMouse.x;
+      this.panY += e.clientY - this.lastMouse.y;
+      this.lastMouse = { x: e.clientX, y: e.clientY };
+      this.draw(); return;
+    }
+    const c = this.toCell(e.clientX, e.clientY);
+    if (App.mode === "edit" && Editor.painting && c.inside) { Editor.paintAt(c.x, c.y, e.shiftKey); }
+    if (this.dragToken && c.inside) {
+      const tok = Tokens.get(this.dragToken.id);
+      if (tok) { tok.x = clamp(c.x, 0, S.map.w - 1); tok.y = clamp(c.y, 0, S.map.h - 1); this.draw(); }
+    }
+    const changed = !this.hoverCell || !c.inside || this.hoverCell.x !== c.x || this.hoverCell.y !== c.y;
+    this.hoverCell = c.inside ? c : null;
+    if (changed) { this.updateHoverInfo(); if (this.measureFrom || this.targeting) this.draw(); }
+    this.lastMouse = { x: e.clientX, y: e.clientY };
+  },
+  onUp(e) {
+    this.panning = false;
+    Editor.painting = false;
+    if (this.dragToken) {
+      const tok = Tokens.get(this.dragToken.id);
+      const d = this.dragToken; this.dragToken = null;
+      if (tok) {
+        const terr = TERRAIN_BY_ID[S.map.terrain[tok.y * S.map.w + tok.x]];
+        const occupied = S.tokens.some(t => t !== tok && t.x === tok.x && t.y === tok.y && !t.dead);
+        let ok = terr.pass && !occupied;
+        let cost = 0;
+        if (ok && S.combat.active && Combat.currentToken()?.id === tok.id) {
+          const key = tok.x + "," + tok.y;
+          if (tok.x === d.ox && tok.y === d.oy) ok = true;
+          else if (this.moveRange && this.moveRange.has(key)) { cost = this.moveRange.get(key); }
+          else ok = false;
+        }
+        if (!ok) { tok.x = d.ox; tok.y = d.oy; }
+        else if (tok.x !== d.ox || tok.y !== d.oy) {
+          if (S.combat.active && Combat.currentToken()?.id === tok.id) Combat.spendMove(cost);
+          if (tok.team === "party") this.revealAround(tok.x, tok.y, 6);
+          this.computeMoveRange();
+          saveSoon();
+        }
+      }
+      App.renderCombat();
+      this.draw();
+    }
+  },
+  onDbl(e) {
+    const c = this.toCell(e.clientX, e.clientY);
+    if (!c.inside) return;
+    const tok = this.tokenAt(c.x, c.y);
+    if (tok && tok.charId) Sheet.open(Characters.get(tok.charId));
+    else if (tok) Chat.system(`${tok.emoji} <b>${esc(tok.name)}</b> — AC ${tok.ac}, HP ${tok.hp}/${tok.maxHp}, speed ${tok.speed}${tok.conditions.length ? ", " + tok.conditions.join(", ") : ""}`);
+  },
+  onWheel(e) {
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    const r = this.canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const oldZoom = this.zoom;
+    this.zoom = clamp(this.zoom * factor, 0.35, 3);
+    this.panX = mx - (mx - this.panX) * (this.zoom / oldZoom);
+    this.panY = my - (my - this.panY) * (this.zoom / oldZoom);
+    this.draw();
+  },
+  moveSelectedTo(x, y) {
+    const tok = Tokens.get(this.selected);
+    if (!tok) return;
+    const key = x + "," + y;
+    if (!this.moveRange || !this.moveRange.has(key)) return;
+    const cost = this.moveRange.get(key);
+    tok.x = x; tok.y = y;
+    if (S.combat.active && Combat.currentToken()?.id === tok.id) Combat.spendMove(cost);
+    if (tok.team === "party") this.revealAround(x, y, 6);
+    this.computeMoveRange();
+    App.renderCombat(); this.draw(); saveSoon();
+  },
+
+  updateHoverInfo() {
+    const el = $("#hoverinfo");
+    if (!this.hoverCell) { el.textContent = "—"; return; }
+    const { x, y } = this.hoverCell;
+    const terr = TERRAIN_BY_ID[S.map.terrain[y * S.map.w + x]];
+    const tok = this.tokenAt(x, y);
+    let s = `(${x},${y}) ${terr.name}`;
+    if (tok) s += ` · ${tok.name} ${tok.hp}/${tok.maxHp} HP`;
+    if (this.measureFrom) {
+      const d = Math.max(Math.abs(x - this.measureFrom.x), Math.abs(y - this.measureFrom.y));
+      s += ` · 📏 ${d} sq (${d * 5} ft)`;
+    }
+    el.textContent = s;
+  },
+
+  /* ---------- movement range (BFS with terrain cost) ---------- */
+  computeMoveRange() {
+    this.moveRange = null;
+    if (!this.selected) return;
+    const tok = Tokens.get(this.selected);
+    if (!tok || tok.dead) return;
+    let budget;
+    if (S.combat.active) {
+      const cur = Combat.currentToken();
+      if (!cur || cur.id !== tok.id) return;
+      budget = Combat.moveLeft();
+    } else {
+      budget = tok.team === "party" ? 99 : 0; // free movement out of combat
+      if (budget === 0) return;
+    }
+    if (tok.conditions.includes("restrained") || tok.conditions.includes("stunned")) budget = 0;
+    if (tok.conditions.includes("slowed")) budget = Math.floor(budget / 2);
+    const occ = new Set(S.tokens.filter(t => !t.dead && t !== tok).map(t => t.x + "," + t.y));
+    const range = new Map();
+    range.set(tok.x + "," + tok.y, 0);
+    const q = [{ x: tok.x, y: tok.y, c: 0 }];
+    while (q.length) {
+      q.sort((a, b) => a.c - b.c);
+      const cur = q.shift();
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]) {
+        const nx = cur.x + dx, ny = cur.y + dy;
+        if (nx < 0 || ny < 0 || nx >= S.map.w || ny >= S.map.h) continue;
+        const terr = TERRAIN_BY_ID[S.map.terrain[ny * S.map.w + nx]];
+        if (!terr.pass) continue;
+        if (occ.has(nx + "," + ny)) continue;
+        const stepCost = terr.cost || 1;
+        const nc = cur.c + stepCost;
+        if (nc > budget) continue;
+        const key = nx + "," + ny;
+        if (range.has(key) && range.get(key) <= nc) continue;
+        range.set(key, nc);
+        q.push({ x: nx, y: ny, c: nc });
+      }
+    }
+    range.delete(tok.x + "," + tok.y);
+    this.moveRange = range;
+  },
+
+  /* ---------- fog ---------- */
+  revealAround(x, y, radius) {
+    let changed = false;
+    for (let dy = -radius; dy <= radius; dy++) for (let dx = -radius; dx <= radius; dx++) {
+      if (dx * dx + dy * dy > radius * radius + radius) continue;
+      const cx = x + dx, cy = y + dy;
+      if (cx < 0 || cy < 0 || cx >= S.map.w || cy >= S.map.h) continue;
+      const i = cy * S.map.w + cx;
+      if (S.map.fog[i]) { S.map.fog[i] = false; changed = true; }
+    }
+    if (changed) { this.draw(); saveSoon(); }
+  },
+
+  /* ---------- targeting ---------- */
+  startTargeting(t) {
+    this.targeting = t;
+    this.canvas.classList.add("targeting");
+    Chat.system(t.prompt || "Choose a target on the board… (Esc to cancel)");
+    this.draw();
+  },
+  cancelTargeting() {
+    this.targeting = null;
+    this.canvas.classList.remove("targeting");
+    this.draw();
+  },
+  resolveTarget(c) {
+    const t = this.targeting;
+    this.targeting = null;
+    this.canvas.classList.remove("targeting");
+    try { t.cb(c); } finally { this.draw(); }
+  },
+
+  /* ---------- rendering ---------- */
+  draw() {
+    if (!this.ctx || !S) return;
+    const ctx = this.ctx;
+    const dpr = devicePixelRatio;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#191510";
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.translate(this.panX, this.panY);
+    const cs = this.cell * this.zoom;
+    const W = S.map.w, H = S.map.h;
+
+    // terrain
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const terr = TERRAIN_BY_ID[S.map.terrain[y * W + x]];
+      ctx.fillStyle = terr.color;
+      ctx.fillRect(x * cs, y * cs, cs, cs);
+      if (terr === TERRAIN.WATER || terr === TERRAIN.LAVA) {
+        ctx.fillStyle = "rgba(255,255,255,.07)";
+        ctx.fillRect(x * cs, y * cs + cs * .55, cs, cs * .12);
+      }
+      if (terr === TERRAIN.ROUGH) {
+        ctx.fillStyle = "rgba(0,0,0,.25)";
+        ctx.beginPath(); ctx.arc(x*cs+cs*.3, y*cs+cs*.35, cs*.05, 0, 7); ctx.arc(x*cs+cs*.68, y*cs+cs*.62, cs*.05, 0, 7); ctx.fill();
+      }
+      if (terr === TERRAIN.DOOR) {
+        ctx.fillStyle = "#4a3015";
+        ctx.fillRect(x*cs+cs*.18, y*cs+cs*.1, cs*.64, cs*.8);
+        ctx.fillStyle = "#c9a227";
+        ctx.beginPath(); ctx.arc(x*cs+cs*.66, y*cs+cs*.5, cs*.05, 0, 7); ctx.fill();
+      }
+      if (terr === TERRAIN.WALL) {
+        ctx.strokeStyle = "rgba(0,0,0,.4)"; ctx.lineWidth = 1;
+        ctx.strokeRect(x*cs+1, y*cs+1, cs-2, cs-2);
+      }
+    }
+    // grid
+    ctx.strokeStyle = "rgba(0,0,0,.18)"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x <= W; x++) { ctx.moveTo(x * cs, 0); ctx.lineTo(x * cs, H * cs); }
+    for (let y = 0; y <= H; y++) { ctx.moveTo(0, y * cs); ctx.lineTo(W * cs, y * cs); }
+    ctx.stroke();
+
+    // move range
+    if (this.moveRange && App.mode === "play") {
+      ctx.fillStyle = "rgba(90,160,220,.28)";
+      for (const key of this.moveRange.keys()) {
+        const [x, y] = key.split(",").map(Number);
+        ctx.fillRect(x * cs + 1, y * cs + 1, cs - 2, cs - 2);
+      }
+    }
+
+    // targeting overlays
+    if (this.targeting && this.hoverCell) {
+      const t = this.targeting, hx = this.hoverCell.x, hy = this.hoverCell.y;
+      if (t.radius) {
+        ctx.fillStyle = "rgba(220,120,60,.32)";
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+          if (Math.max(Math.abs(x - hx), Math.abs(y - hy)) <= t.radius) ctx.fillRect(x*cs+1, y*cs+1, cs-2, cs-2);
+        }
+      }
+      ctx.strokeStyle = "rgba(255,180,80,.9)"; ctx.lineWidth = 2;
+      ctx.strokeRect(hx * cs + 1, hy * cs + 1, cs - 2, cs - 2);
+      if (t.origin) this.drawLine(t.origin.x, t.origin.y, hx, hy, "rgba(255,180,80,.6)");
+    }
+
+    // measure
+    if (this.measureFrom && this.hoverCell) {
+      this.drawLine(this.measureFrom.x, this.measureFrom.y, this.hoverCell.x, this.hoverCell.y, "rgba(120,220,160,.85)");
+      const d = Math.max(Math.abs(this.hoverCell.x - this.measureFrom.x), Math.abs(this.hoverCell.y - this.measureFrom.y));
+      ctx.fillStyle = "#7ee0a0";
+      ctx.font = `bold ${Math.max(12, cs * .4)}px Verdana`;
+      ctx.fillText(`${d * 5} ft`, this.hoverCell.x * cs + cs * .2, this.hoverCell.y * cs - 6);
+    }
+
+    // tokens
+    for (const tok of S.tokens) {
+      const i = tok.y * W + tok.x;
+      if (this.showFog && App.mode === "play" && S.map.fog[i] && tok.team !== "party") continue;
+      this.drawToken(ctx, tok, cs);
+    }
+
+    // fog
+    if (this.showFog) {
+      ctx.fillStyle = App.mode === "edit" ? "rgba(8,5,3,.55)" : "rgba(10,7,4,.93)";
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        if (S.map.fog[y * W + x]) ctx.fillRect(x * cs, y * cs, cs + .5, cs + .5);
+      }
+    }
+
+    // map border
+    ctx.strokeStyle = "#5a4630"; ctx.lineWidth = 3;
+    ctx.strokeRect(-1.5, -1.5, W * cs + 3, H * cs + 3);
+  },
+  drawLine(x1, y1, x2, y2, color) {
+    const ctx = this.ctx, cs = this.cell * this.zoom;
+    ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.setLineDash([7, 5]);
+    ctx.beginPath();
+    ctx.moveTo(x1 * cs + cs / 2, y1 * cs + cs / 2);
+    ctx.lineTo(x2 * cs + cs / 2, y2 * cs + cs / 2);
+    ctx.stroke(); ctx.setLineDash([]);
+  },
+  drawToken(ctx, tok, cs) {
+    const cx = tok.x * cs + cs / 2, cy = tok.y * cs + cs / 2, r = cs * .42;
+    const teamColor = tok.team === "party" ? "#c9a227" : tok.team === "enemy" ? "#a5372c" : "#8a8a8a";
+    ctx.save();
+    if (tok.dead) ctx.globalAlpha = .38;
+    // base
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
+    ctx.fillStyle = "rgba(20,14,8,.88)"; ctx.fill();
+    ctx.lineWidth = Math.max(2, cs * .06);
+    ctx.strokeStyle = teamColor; ctx.stroke();
+    // selection glow
+    if (this.selected === tok.id) {
+      ctx.beginPath(); ctx.arc(cx, cy, r + cs * .08, 0, 7);
+      ctx.strokeStyle = "rgba(232,196,84,.9)"; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    // current turn ring
+    if (S.combat.active && Combat.currentToken()?.id === tok.id) {
+      ctx.beginPath(); ctx.arc(cx, cy, r + cs * .14, 0, 7);
+      ctx.strokeStyle = "#7ee07e"; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+    // HP arc
+    if (!tok.dead && tok.hp < tok.maxHp) {
+      const frac = tok.hp / tok.maxHp;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r - cs * .02, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+      ctx.strokeStyle = frac > .5 ? "#7ec26a" : frac > .25 ? "#d6b45a" : "#d65a4a";
+      ctx.lineWidth = Math.max(2, cs * .07); ctx.stroke();
+    }
+    // emoji
+    ctx.font = `${cs * .55}px serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(tok.dead ? "💀" : tok.emoji, cx, cy + cs * .02);
+    // condition badges
+    if (tok.conditions.length && !tok.dead) {
+      ctx.font = `${cs * .28}px serif`;
+      tok.conditions.slice(0, 3).forEach((c, i) => {
+        ctx.fillText(RULES.conditions[c]?.emoji || "•", cx - r + i * cs * .3 + cs*.05, cy - r - cs * .02);
+      });
+    }
+    // name (when zoomed in)
+    if (this.zoom > .7) {
+      ctx.font = `bold ${Math.max(9, cs * .22)}px Verdana`;
+      ctx.fillStyle = "rgba(255,244,214,.92)";
+      ctx.strokeStyle = "rgba(0,0,0,.75)"; ctx.lineWidth = 2.5;
+      ctx.strokeText(tok.name, cx, cy + r + cs * .17);
+      ctx.fillText(tok.name, cx, cy + r + cs * .17);
+    }
+    ctx.restore();
+  },
+};
+
+/* ============================================================
+   MAP EDITOR
+   ============================================================ */
+const Editor = {
+  brush: TERRAIN.WALL.id,
+  painting: false,
+  init() {
+    const grid = $("#terrain-grid");
+    for (const t of Object.values(TERRAIN)) {
+      const b = document.createElement("button");
+      b.className = "terr-btn" + (t.id === this.brush ? " sel" : "");
+      b.style.background = t.color;
+      b.title = t.name + (t.cost ? " (difficult)" : "") + (t.pass ? "" : " (blocks)");
+      b.textContent = t === TERRAIN.DOOR ? "🚪" : "";
+      b.onclick = () => { this.brush = t.id; $$(".terr-btn").forEach(x => x.classList.remove("sel")); b.classList.add("sel"); $("#fog-brush").checked = false; };
+      grid.appendChild(b);
+    }
+    $("#map-resize").onclick = () => this.resizeMap();
+    $("#map-clear").onclick = () => { if (confirm("Clear the whole map?")) { S.map = blankMap(S.map.w, S.map.h); Board.draw(); saveSoon(); } };
+    $("#gen-dungeon").onclick = () => {
+      const rooms = parseInt($("#gen-rooms").value) || 7;
+      const seed = $("#gen-seed").value.trim();
+      Dungeon.generate({ rooms, seed: seed || undefined });
+      Chat.system("⚒ Dungeon generated" + (seed ? ` (seed "${esc(seed)}")` : ""));
+    };
+    $("#fog-reveal-all").onclick = () => { S.map.fog.fill(false); Board.draw(); saveSoon(); };
+    $("#fog-hide-all").onclick = () => { S.map.fog.fill(true); Board.draw(); saveSoon(); };
+    $("#map-save").onclick = () => this.saveToLibrary();
+    this.renderLibrary();
+  },
+  paintAt(x, y, shift) {
+    const size = clamp(parseInt($("#brush-size").value) || 1, 1, 6);
+    const fogBrush = $("#fog-brush").checked;
+    for (let dy = 0; dy < size; dy++) for (let dx = 0; dx < size; dx++) {
+      const cx = x + dx - Math.floor(size / 2), cy = y + dy - Math.floor(size / 2);
+      if (cx < 0 || cy < 0 || cx >= S.map.w || cy >= S.map.h) continue;
+      const i = cy * S.map.w + cx;
+      if (fogBrush) S.map.fog[i] = !shift;
+      else S.map.terrain[i] = shift ? TERRAIN.FLOOR.id : this.brush;
+    }
+    Board.draw(); saveSoon();
+  },
+  resizeMap() {
+    const w = clamp(parseInt($("#map-w").value) || 30, 10, 80);
+    const h = clamp(parseInt($("#map-h").value) || 22, 10, 80);
+    const old = S.map;
+    const m = blankMap(w, h);
+    m.name = old.name;
+    for (let y = 0; y < Math.min(h, old.h); y++) for (let x = 0; x < Math.min(w, old.w); x++) {
+      m.terrain[y * w + x] = old.terrain[y * old.w + x];
+      m.fog[y * w + x] = old.fog[y * old.w + x];
+    }
+    S.map = m;
+    S.tokens.forEach(t => { t.x = clamp(t.x, 0, w - 1); t.y = clamp(t.y, 0, h - 1); });
+    Board.center(); saveSoon();
+  },
+  saveToLibrary() {
+    const name = $("#map-name").value.trim() || S.map.name || "Untitled";
+    S.map.name = name;
+    const id = uid();
+    S.mapLibrary[id] = JSON.parse(JSON.stringify({ ...S.map, name }));
+    this.renderLibrary(); saveSoon();
+    Chat.system(`Map "<b>${esc(name)}</b>" saved to library.`);
+  },
+  renderLibrary() {
+    const el = $("#maplib");
+    el.innerHTML = "";
+    const entries = Object.entries(S.mapLibrary || {});
+    if (!entries.length) { el.innerHTML = `<div style="color:var(--text-dim);font-style:italic">No saved maps yet.</div>`; return; }
+    for (const [id, m] of entries) {
+      const d = document.createElement("div");
+      d.className = "maplib-item";
+      d.innerHTML = `<span>🗺 ${esc(m.name)} <small style="opacity:.6">${m.w}×${m.h}</small></span>`;
+      const load = document.createElement("button"); load.textContent = "Load"; load.title = "Load this map";
+      load.onclick = () => { S.map = JSON.parse(JSON.stringify(m)); Board.center(); saveSoon(); Chat.system(`Map "<b>${esc(m.name)}</b>" loaded.`); };
+      const del = document.createElement("button"); del.textContent = "✕"; del.title = "Delete";
+      del.onclick = () => { delete S.mapLibrary[id]; this.renderLibrary(); saveSoon(); };
+      d.appendChild(load); d.appendChild(del);
+      el.appendChild(d);
+    }
+  },
+};
+
+/* ============================================================
+   DUNGEON GENERATOR — seedable rooms & corridors
+   ============================================================ */
+const Dungeon = {
+  generate({ w = null, h = null, rooms = 7, seed = undefined, theme = "dungeon" } = {}) {
+    w = clamp(w || S.map.w || 34, 16, 80);
+    h = clamp(h || S.map.h || 24, 14, 80);
+    const rng = mulberry32(seed !== undefined ? hashSeed(String(seed)) : (Math.random() * 2 ** 32) >>> 0);
+    const m = blankMap(w, h, TERRAIN.VOID.id);
+    m.name = S.map.name || "Generated dungeon";
+    m.fog.fill(true);
+
+    const placed = [];
+    const maxTries = rooms * 14;
+    for (let t = 0; t < maxTries && placed.length < rooms; t++) {
+      const rw = 3 + Math.floor(rng() * 6), rh = 3 + Math.floor(rng() * 5);
+      const rx = 1 + Math.floor(rng() * (w - rw - 2)), ry = 1 + Math.floor(rng() * (h - rh - 2));
+      if (placed.some(r => rx < r.x + r.w + 1 && rx + rw + 1 > r.x && ry < r.y + r.h + 1 && ry + rh + 1 > r.y)) continue;
+      placed.push({ x: rx, y: ry, w: rw, h: rh, cx: rx + Math.floor(rw / 2), cy: ry + Math.floor(rh / 2) });
+    }
+    const set = (x, y, v) => { if (x >= 0 && y >= 0 && x < w && y < h) m.terrain[y * w + x] = v; };
+    const get = (x, y) => m.terrain[y * w + x];
+
+    for (const r of placed)
+      for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) set(x, y, TERRAIN.FLOOR.id);
+
+    // connect rooms with L corridors in placement order
+    for (let i = 1; i < placed.length; i++) {
+      const a = placed[i - 1], b = placed[i];
+      let x = a.cx, y = a.cy;
+      const horizFirst = rng() < .5;
+      const carve = (x, y) => { if (get(x, y) === TERRAIN.VOID.id) set(x, y, TERRAIN.FLOOR.id); };
+      if (horizFirst) {
+        while (x !== b.cx) { x += Math.sign(b.cx - x); carve(x, y); }
+        while (y !== b.cy) { y += Math.sign(b.cy - y); carve(x, y); }
+      } else {
+        while (y !== b.cy) { y += Math.sign(b.cy - y); carve(x, y); }
+        while (x !== b.cx) { x += Math.sign(b.cx - x); carve(x, y); }
+      }
+    }
+    // walls around floors
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (get(x, y) !== TERRAIN.VOID.id) continue;
+      let adj = false;
+      for (let dy = -1; dy <= 1 && !adj; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        if (get(nx, ny) === TERRAIN.FLOOR.id) { adj = true; break; }
+      }
+      if (adj) set(x, y, TERRAIN.WALL.id);
+    }
+    // doors where corridors meet room edges
+    for (const r of placed) {
+      for (let x = r.x; x < r.x + r.w; x++) {
+        if (r.y - 1 >= 0 && get(x, r.y - 1) === TERRAIN.FLOOR.id && get(x - 1, r.y - 1) !== TERRAIN.FLOOR.id && get(x + 1, r.y - 1) !== TERRAIN.FLOOR.id && rng() < .8) set(x, r.y - 1, TERRAIN.DOOR.id);
+        const by = r.y + r.h;
+        if (by < h && get(x, by) === TERRAIN.FLOOR.id && get(x - 1, by) !== TERRAIN.FLOOR.id && get(x + 1, by) !== TERRAIN.FLOOR.id && rng() < .8) set(x, by, TERRAIN.DOOR.id);
+      }
+      for (let y = r.y; y < r.y + r.h; y++) {
+        if (r.x - 1 >= 0 && get(r.x - 1, y) === TERRAIN.FLOOR.id && get(r.x - 1, y - 1) !== TERRAIN.FLOOR.id && get(r.x - 1, y + 1) !== TERRAIN.FLOOR.id && rng() < .8) set(r.x - 1, y, TERRAIN.DOOR.id);
+        const bx = r.x + r.w;
+        if (bx < w && get(bx, y) === TERRAIN.FLOOR.id && get(bx, y - 1) !== TERRAIN.FLOOR.id && get(bx, y + 1) !== TERRAIN.FLOOR.id && rng() < .8) set(bx, y, TERRAIN.DOOR.id);
+      }
+    }
+    // flavor terrain in some rooms
+    for (const r of placed) {
+      const roll = rng();
+      if (roll < .18 && r.w >= 4 && r.h >= 4) { // pool
+        const px = r.x + 1 + Math.floor(rng() * (r.w - 2)), py = r.y + 1 + Math.floor(rng() * (r.h - 2));
+        set(px, py, TERRAIN.WATER.id); set(px + 1, py, TERRAIN.WATER.id); set(px, py + 1, TERRAIN.WATER.id);
+      } else if (roll < .3) { // rubble
+        for (let i = 0; i < 3; i++) set(r.x + Math.floor(rng() * r.w), r.y + Math.floor(rng() * r.h), TERRAIN.ROUGH.id);
+      } else if (roll < .36 && theme === "volcanic") {
+        set(r.cx, r.cy, TERRAIN.LAVA.id);
+      }
+    }
+    S.map = m;
+    // place party at the first room and reveal it
+    const start = placed[0];
+    if (start) {
+      let i = 0;
+      for (const c of S.party) {
+        const tok = Tokens.forChar(c);
+        const pos = Tokens.findOpenCell(start.cx + (i % 2), start.cy + Math.floor(i / 2));
+        if (tok) { tok.x = pos.x; tok.y = pos.y; } else Tokens.spawnCharacter(c, pos.x, pos.y);
+        Board.revealAround(pos.x, pos.y, 6);
+        i++;
+      }
+    }
+    Board.center(); saveSoon();
+    return { rooms: placed };
+  },
+};
+
+/* ============================================================
+   MODAL INFRASTRUCTURE
+   ============================================================ */
+const Modal = {
+  open({ title, body, foot = "", onClose = null, wide = false }) {
+    this.close();
+    const veil = document.createElement("div");
+    veil.id = "modal-veil";
+    veil.innerHTML = `<div class="modal" style="${wide ? "max-width:760px" : ""}">
+      <div class="modal-head"><h2>${title}</h2><button class="modal-x">✕</button></div>
+      <div class="modal-body">${body}</div>
+      ${foot ? `<div class="modal-foot">${foot}</div>` : ""}
+    </div>`;
+    veil.querySelector(".modal-x").onclick = () => { this.close(); onClose && onClose(); };
+    veil.addEventListener("mousedown", e => { if (e.target === veil) { this.close(); onClose && onClose(); } });
+    $("#modals").appendChild(veil);
+    return veil;
+  },
+  close() { const v = $("#modal-veil"); if (v) v.remove(); },
+};
+
+/* ============================================================
+   CHARACTERS
+   ============================================================ */
+const Characters = {
+  get(id) { return S.party.find(c => c.id === id); },
+  prof(c) { return RULES.profByLevel[clamp(c.level, 1, RULES.maxLevel) - 1]; },
+  mod(c, ab) { return ABILITY_MOD(c.abilities[ab]); },
+  ac(c) {
+    const armor = RULES.armors[c.armor] || RULES.armors.none;
+    let ac = armor.ac + Math.min(this.mod(c, "dex"), armor.dexMax);
+    if (c.shield) ac += 2;
+    if (c.species === "dragonkin" && c.armor !== "plate" && c.armor !== "chainmail") ac += 1;
+    return ac;
+  },
+  maxHp(c) {
+    const die = RULES.classes[c.klass].hitDie;
+    let hp = die + this.mod(c, "con");
+    for (let l = 2; l <= c.level; l++) hp += Math.floor(die / 2) + 1 + this.mod(c, "con");
+    if (c.species === "dwarf") hp += c.level;
+    return Math.max(1, hp);
+  },
+  maxMana(c) {
+    const k = RULES.classes[c.klass];
+    if (!k.caster) return 0;
+    let mana = k.manaPerLevel * c.level + Math.max(0, this.mod(c, k.caster));
+    if (c.klass === "ranger" && c.level < 2) mana = 0;
+    return mana;
+  },
+  spellDC(c) { const k = RULES.classes[c.klass]; return k.caster ? 8 + this.prof(c) + this.mod(c, k.caster) : 10; },
+  spellAtk(c) { const k = RULES.classes[c.klass]; return k.caster ? this.prof(c) + this.mod(c, k.caster) : 0; },
+  attackBonus(c, weapon) {
+    let b = this.mod(c, weapon.ab) + this.prof(c);
+    if (c.klass === "fighter") b += 1;
+    return b;
+  },
+  damageExpr(c, weapon) {
+    let expr = weapon.dmg;
+    const m = this.mod(c, weapon.ab);
+    if (m) expr += (m > 0 ? "+" : "") + m;
+    if (c.species === "orc" && weapon.range === 1) expr += "+1";
+    if (c.klass === "ranger" && weapon.range > 1) expr += "+2";
+    return expr;
+  },
+  skillMod(c, skillId) {
+    const sk = RULES.skills[skillId];
+    let m = this.mod(c, sk.ab);
+    if (c.skills.includes(skillId)) m += this.prof(c);
+    else if (c.klass === "bard" && c.level >= 2) m += 1;
+    return m;
+  },
+  maxSpellTier(c) { return c.level >= 5 ? 3 : c.level >= 3 ? 2 : 1; },
+  knownSpells(c) { return (c.spells || []).map(id => ({ id, ...RULES.spells[id] })).filter(s => s.name); },
+  awardXp(c, xp) {
+    c.xp = (c.xp || 0) + xp;
+    while (c.level < RULES.maxLevel && c.xp >= RULES.xpToLevel[c.level]) {
+      c.level++;
+      const oldMax = c.maxHp;
+      c.maxHp = this.maxHp(c); c.hp += c.maxHp - oldMax;
+      c.maxMana = this.maxMana(c); c.mana = c.maxMana;
+      Chat.system(`🎉 <b>${esc(c.name)}</b> reaches <b>level ${c.level}</b>! ` +
+        (RULES.classes[c.klass].features[c.level] || []).map(esc).join(" "));
+      const tok = Tokens.forChar(c);
+      if (tok) { tok.maxHp = c.maxHp; tok.hp = c.hp; tok.ac = this.ac(c); }
+    }
+  },
+  summaryLine(c) {
+    return `${c.name} — level ${c.level} ${RULES.species[c.species].name} ${RULES.classes[c.klass].name}, ` +
+      `HP ${c.hp}/${c.maxHp}${c.maxMana ? `, mana ${c.mana}/${c.maxMana}` : ""}, AC ${this.ac(c)}, ` +
+      RULES.abilities.map(a => `${a.toUpperCase()} ${c.abilities[a]}`).join(" ");
+  },
+  renderParty() {
+    const el = $("#party-list");
+    el.innerHTML = "";
+    if (!S.party.length) {
+      el.innerHTML = `<div class="empty-note">No heroes yet.<br><br>Create a character to begin your tale — or ask the DM to start a <b>New Adventure</b> and build your party first.</div>`;
+      return;
+    }
+    for (const c of S.party) {
+      const d = document.createElement("div");
+      d.className = "pc-card";
+      const hpFrac = c.hp / c.maxHp;
+      d.innerHTML = `
+        <div class="pc-portrait">${c.emoji}</div>
+        <div class="pc-info">
+          <div class="pc-name">${esc(c.name)}</div>
+          <div class="pc-sub">Level ${c.level} ${RULES.species[c.species].name} ${RULES.classes[c.klass].name} · AC ${this.ac(c)}</div>
+          <div class="bar bar-hp${hpFrac <= .3 ? " low" : ""}"><i style="width:${hpFrac * 100}%"></i></div>
+          <div class="bar-label"><span>HP ${c.hp}/${c.maxHp}</span><span>XP ${c.xp || 0}</span></div>
+          ${c.maxMana ? `<div class="bar bar-mana"><i style="width:${(c.mana / c.maxMana) * 100}%"></i></div><div class="bar-label"><span>Mana ${c.mana}/${c.maxMana}</span></div>` : ""}
+        </div>`;
+      d.onclick = () => Sheet.open(c);
+      el.appendChild(d);
+    }
+  },
+};
+
+/* ============================================================
+   CHARACTER CREATOR — 6-step wizard
+   ============================================================ */
+const Creator = {
+  step: 0,
+  draft: null,
+  steps: ["Species", "Class", "Abilities", "Skills", "Gear", "Identity"],
+
+  start() {
+    this.step = 0;
+    this.draft = {
+      species: null, klass: null,
+      method: "pointbuy",
+      abilities: { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 },
+      arrayAssign: {}, rolled: null,
+      skills: [], weapons: [], armor: null, shield: false,
+      name: "", emoji: "🧑", backstory: "",
+    };
+    this.render();
+  },
+  render() {
+    const stepsHtml = this.steps.map((s, i) =>
+      `<div class="wiz-step ${i === this.step ? "on" : i < this.step ? "done" : ""}">${i + 1}. ${s}</div>`).join("");
+    const veil = Modal.open({
+      title: "🪶 Create a Hero",
+      wide: true,
+      body: `<div id="wiz-body"></div>`,
+      foot: `<button class="m-btn" id="wiz-back" ${this.step === 0 ? "disabled" : ""}>← Back</button>
+             <button class="m-btn primary" id="wiz-next">${this.step === 5 ? "⚔️ Forge Hero" : "Next →"}</button>`,
+    });
+    veil.querySelector(".modal-head").insertAdjacentHTML("afterend", `<div class="wiz-steps">${stepsHtml}</div>`);
+    $("#wiz-back").onclick = () => { this.step--; this.render(); };
+    $("#wiz-next").onclick = () => this.next();
+    this["renderStep" + this.step]();
+  },
+  next() {
+    const err = this.validate();
+    if (err) { alert(err); return; }
+    if (this.step === 5) { this.finish(); return; }
+    this.step++;
+    this.render();
+  },
+  validate() {
+    const d = this.draft;
+    switch (this.step) {
+      case 0: return d.species ? null : "Choose a species.";
+      case 1: return d.klass ? null : "Choose a class.";
+      case 2:
+        if (d.method === "pointbuy") { const left = this.pointsLeft(); return left === 0 ? null : `Spend all points (${left} left).`; }
+        if (d.method === "array" || d.method === "roll") {
+          const vals = Object.values(d.arrayAssign);
+          return vals.length === 6 && new Set(Object.keys(d.arrayAssign)).size === 6 ? null : "Assign every score to an ability.";
+        }
+        return null;
+      case 3: {
+        const k = RULES.classes[d.klass];
+        return d.skills.length === k.skillCount ? null : `Choose exactly ${k.skillCount} skills.`;
+      }
+      case 4: return d.weapons.length ? null : "Choose at least one weapon.";
+      case 5: return d.name.trim() ? null : "Give your hero a name.";
+    }
+    return null;
+  },
+
+  /* ---- step 0: species ---- */
+  renderStep0() {
+    const b = $("#wiz-body");
+    b.innerHTML = `<div class="choice-grid">` + Object.entries(RULES.species).map(([id, sp]) => `
+      <div class="choice-card ${this.draft.species === id ? "sel" : ""}" data-id="${id}">
+        <div class="cc-emoji">${sp.emoji}</div><div class="cc-name">${sp.name}</div>
+        <div class="cc-desc">${sp.desc}</div>
+      </div>`).join("") + `</div><div class="detail-box" id="sp-detail">Select a species to see its traits.</div>`;
+    b.querySelectorAll(".choice-card").forEach(card => card.onclick = () => {
+      this.draft.species = card.dataset.id;
+      b.querySelectorAll(".choice-card").forEach(x => x.classList.remove("sel"));
+      card.classList.add("sel");
+      const sp = RULES.species[card.dataset.id];
+      $("#sp-detail").innerHTML = `<b>Bonuses:</b> ` +
+        Object.entries(sp.bonus).map(([a, v]) => `${a.toUpperCase()} +${v}`).join(", ") +
+        ` · <b>Speed:</b> ${sp.speed} squares<br>` + sp.traits.map(t => `• ${t}`).join("<br>");
+    });
+    if (this.draft.species) b.querySelector(`[data-id="${this.draft.species}"]`)?.click();
+  },
+  /* ---- step 1: class ---- */
+  renderStep1() {
+    const b = $("#wiz-body");
+    b.innerHTML = `<div class="choice-grid">` + Object.entries(RULES.classes).map(([id, k]) => `
+      <div class="choice-card ${this.draft.klass === id ? "sel" : ""}" data-id="${id}">
+        <div class="cc-emoji">${k.emoji}</div><div class="cc-name">${k.name}</div>
+        <div class="cc-desc">${k.desc}</div>
+      </div>`).join("") + `</div><div class="detail-box" id="kl-detail">Select a class to see its features.</div>`;
+    b.querySelectorAll(".choice-card").forEach(card => card.onclick = () => {
+      const id = card.dataset.id;
+      if (this.draft.klass !== id) { this.draft.skills = []; this.draft.weapons = []; this.draft.armor = null; this.draft.spells = null; }
+      this.draft.klass = id;
+      b.querySelectorAll(".choice-card").forEach(x => x.classList.remove("sel"));
+      card.classList.add("sel");
+      const k = RULES.classes[id];
+      $("#kl-detail").innerHTML = `<b>Hit die:</b> d${k.hitDie} · <b>Primary:</b> ${k.primary.toUpperCase()}` +
+        (k.caster ? ` · <b>Caster</b> (${k.caster.toUpperCase()})` : "") + `<br><b>Level 1:</b> ` +
+        k.features[1].map(esc).join(" ");
+    });
+    if (this.draft.klass) b.querySelector(`[data-id="${this.draft.klass}"]`)?.click();
+  },
+  /* ---- step 2: abilities ---- */
+  pointsLeft() {
+    const cost = RULES.pointBuy.cost;
+    let spent = 0;
+    for (const a of RULES.abilities) spent += cost[this.draft.abilities[a]];
+    return RULES.pointBuy.budget - spent;
+  },
+  renderStep2() {
+    const d = this.draft;
+    const b = $("#wiz-body");
+    b.innerHTML = `
+      <div class="method-tabs">
+        <button class="method-tab ${d.method === "pointbuy" ? "on" : ""}" data-m="pointbuy">Point Buy (27)</button>
+        <button class="method-tab ${d.method === "array" ? "on" : ""}" data-m="array">Standard Array</button>
+        <button class="method-tab ${d.method === "roll" ? "on" : ""}" data-m="roll">Roll 4d6</button>
+      </div>
+      <div id="abil-area"></div>`;
+    b.querySelectorAll(".method-tab").forEach(t => t.onclick = () => {
+      d.method = t.dataset.m; d.arrayAssign = {};
+      if (d.method === "pointbuy") d.abilities = { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 };
+      this.renderStep2();
+    });
+    const area = $("#abil-area");
+    const bonus = d.species ? RULES.species[d.species].bonus : {};
+    if (d.method === "pointbuy") {
+      area.innerHTML = `<div class="points-left">Points remaining: <b id="pl">${this.pointsLeft()}</b></div><div class="abil-grid" id="ag"></div>
+        <div class="form-hint" style="margin-top:8px">Costs: 8→0 · 9→1 · 10→2 · 11→3 · 12→4 · 13→5 · 14→7 · 15→9. Species bonuses are added after.</div>`;
+      const ag = $("#ag");
+      for (const a of RULES.abilities) {
+        const cell = document.createElement("div"); cell.className = "abil-cell";
+        const update = () => {
+          const base = d.abilities[a], total = base + (bonus[a] || 0);
+          cell.innerHTML = `<div class="ab-name">${RULES.abilityNames[a]}</div>
+            <div class="ab-score">${total}</div>
+            <div class="ab-mod">base ${base}${bonus[a] ? " +" + bonus[a] : ""} · mod ${fmtMod(ABILITY_MOD(total))}</div>
+            <div class="ab-ctl"><button data-d="-1" ${base <= 8 ? "disabled" : ""}>−</button><button data-d="1" ${base >= 15 ? "disabled" : ""}>+</button></div>`;
+          cell.querySelectorAll("button").forEach(btn => btn.onclick = () => {
+            const nd = base + parseInt(btn.dataset.d);
+            if (nd < 8 || nd > 15) return;
+            const oldCost = RULES.pointBuy.cost[base], newCost = RULES.pointBuy.cost[nd];
+            if (this.pointsLeft() - (newCost - oldCost) < 0) return;
+            d.abilities[a] = nd; update(); $("#pl").textContent = this.pointsLeft();
+          });
+        };
+        update(); ag.appendChild(cell);
+      }
+    } else {
+      let pool;
+      if (d.method === "array") pool = [...RULES.standardArray];
+      else {
+        if (!d.rolled) {
+          d.rolled = [];
+          for (let i = 0; i < 6; i++) d.rolled.push(Dice.roll("4d6kh3").total);
+        }
+        pool = [...d.rolled];
+      }
+      area.innerHTML = (d.method === "roll" ? `<div class="points-left">You rolled: <b>${pool.join(", ")}</b> <button class="m-btn" id="reroll" style="padding:3px 12px;font-size:11px;margin-left:8px">↻ Reroll</button></div>` : `<div class="points-left">Assign: <b>${pool.join(", ")}</b></div>`) +
+        `<div class="abil-grid" id="ag"></div>`;
+      if ($("#reroll")) $("#reroll").onclick = () => { d.rolled = null; d.arrayAssign = {}; this.renderStep2(); };
+      const ag = $("#ag");
+      const rerender = () => {
+        ag.innerHTML = "";
+        const taken = {};
+        for (const [ab, idx] of Object.entries(d.arrayAssign)) taken[idx] = ab;
+        for (const a of RULES.abilities) {
+          const cell = document.createElement("div"); cell.className = "abil-cell";
+          const assignedIdx = d.arrayAssign[a];
+          const val = assignedIdx != null ? pool[assignedIdx] : null;
+          const total = val != null ? val + (bonus[a] || 0) : null;
+          let opts = `<option value="">—</option>`;
+          pool.forEach((v, i) => {
+            const owner = taken[i];
+            if (owner && owner !== a) return;
+            opts += `<option value="${i}" ${assignedIdx === i ? "selected" : ""}>${v}</option>`;
+          });
+          cell.innerHTML = `<div class="ab-name">${RULES.abilityNames[a]}</div>
+            <div class="ab-score">${total ?? "?"}</div>
+            <div class="ab-mod">${total != null ? (bonus[a] ? `+${bonus[a]} species · ` : "") + "mod " + fmtMod(ABILITY_MOD(total)) : "unassigned"}</div>
+            <select>${opts}</select>`;
+          cell.querySelector("select").onchange = e => {
+            const v = e.target.value;
+            if (v === "") delete d.arrayAssign[a]; else d.arrayAssign[a] = parseInt(v);
+            rerender();
+          };
+          ag.appendChild(cell);
+        }
+      };
+      rerender();
+    }
+  },
+  /* ---- step 3: skills ---- */
+  renderStep3() {
+    const d = this.draft, k = RULES.classes[d.klass];
+    const b = $("#wiz-body");
+    b.innerHTML = `<div class="points-left">Choose <b>${k.skillCount}</b> skills from your class list (<span id="sc">${d.skills.length}</span>/${k.skillCount})</div>
+      <div class="skill-list" id="sl"></div>`;
+    const sl = $("#sl");
+    for (const [id, sk] of Object.entries(RULES.skills)) {
+      const allowed = k.skillChoices.includes(id);
+      const row = document.createElement("label");
+      row.className = "skill-pick" + (d.skills.includes(id) ? " sel" : "") + (allowed ? "" : " locked");
+      row.innerHTML = `<input type="checkbox" ${d.skills.includes(id) ? "checked" : ""} ${allowed ? "" : "disabled"}>
+        <span style="flex:1">${sk.name}</span><small style="opacity:.6">${sk.ab.toUpperCase()}</small>`;
+      const cb = row.querySelector("input");
+      cb.onchange = () => {
+        if (cb.checked) {
+          if (d.skills.length >= k.skillCount) { cb.checked = false; return; }
+          d.skills.push(id);
+        } else d.skills = d.skills.filter(s => s !== id);
+        row.classList.toggle("sel", cb.checked);
+        $("#sc").textContent = d.skills.length;
+      };
+      sl.appendChild(row);
+    }
+  },
+  /* ---- step 4: gear ---- */
+  renderStep4() {
+    const d = this.draft, k = RULES.classes[d.klass];
+    const b = $("#wiz-body");
+    const weaponOpts = k.kit.weapons.map(w => {
+      const wp = RULES.weapons[w];
+      return `<label class="skill-pick ${d.weapons.includes(w) ? "sel" : ""}">
+        <input type="checkbox" data-w="${w}" ${d.weapons.includes(w) ? "checked" : ""}>
+        <span style="flex:1">${wp.emoji} ${wp.name}</span><small style="opacity:.6">${wp.dmg} · ${wp.range > 1 ? "range " + wp.range : "melee"}</small></label>`;
+    }).join("");
+    const armorOpts = ["none", ...k.kit.armor].map(a => {
+      const ar = RULES.armors[a];
+      return `<label class="skill-pick ${d.armor === a || (!d.armor && a === "none") ? "sel" : ""}">
+        <input type="radio" name="armor" data-a="${a}" ${d.armor === a || (!d.armor && a === "none") ? "checked" : ""}>
+        <span style="flex:1">${ar.name}</span><small style="opacity:.6">AC ${ar.ac}${ar.dexMax < 90 ? " (dex max +" + ar.dexMax + ")" : "+DEX"}</small></label>`;
+    }).join("");
+    b.innerHTML = `
+      <h4 style="color:var(--gold-bright);margin-bottom:7px">Weapons <small style="color:var(--text-dim);font-family:Verdana;font-size:10px">(pick up to 2)</small></h4>
+      <div class="skill-list">${weaponOpts}</div>
+      <h4 style="color:var(--gold-bright);margin:14px 0 7px">Armor</h4>
+      <div class="skill-list">${armorOpts}</div>
+      ${k.kit.shieldOption ? `<label class="skill-pick" style="margin-top:10px;${d.shield ? "border-color:var(--gold-bright)" : ""}"><input type="checkbox" id="shield-cb" ${d.shield ? "checked" : ""}><span>🛡 Carry a shield (+2 AC)</span></label>` : ""}
+      <div class="detail-box">Every hero also carries: ${RULES.gear.join(", ")} — and <b>10 gold</b>.</div>`;
+    b.querySelectorAll("[data-w]").forEach(cb => cb.onchange = () => {
+      const w = cb.dataset.w;
+      if (cb.checked) { if (d.weapons.length >= 2) { cb.checked = false; return; } d.weapons.push(w); }
+      else d.weapons = d.weapons.filter(x => x !== w);
+      cb.closest("label").classList.toggle("sel", cb.checked);
+    });
+    b.querySelectorAll("[data-a]").forEach(r => r.onchange = () => {
+      d.armor = r.dataset.a;
+      b.querySelectorAll("[name=armor]").forEach(x => x.closest("label").classList.toggle("sel", x.checked));
+    });
+    if ($("#shield-cb")) $("#shield-cb").onchange = e => { d.shield = e.target.checked; };
+  },
+  /* ---- step 5: identity ---- */
+  renderStep5() {
+    const d = this.draft;
+    const b = $("#wiz-body");
+    const abilities = this.finalAbilities();
+    b.innerHTML = `
+      <div class="form-row"><label>Name</label><input type="text" id="hero-name" value="${esc(d.name)}" placeholder="e.g. Thora Emberfall" maxlength="24"></div>
+      <div class="form-row"><label>Portrait</label><div class="emoji-grid" id="eg"></div></div>
+      <div class="form-row"><label>Backstory (the DM will weave this in)</label><textarea id="hero-story" placeholder="A sentence or two…">${esc(d.backstory)}</textarea></div>
+      <div class="detail-box"><b>Summary:</b> ${RULES.species[d.species].name} ${RULES.classes[d.klass].name} — ` +
+      RULES.abilities.map(a => `${a.toUpperCase()} ${abilities[a]}`).join(" · ") +
+      `<br><b>Skills:</b> ${d.skills.map(s => RULES.skills[s].name).join(", ")}` +
+      `<br><b>Gear:</b> ${d.weapons.map(w => RULES.weapons[w].name).join(", ")}${d.armor && d.armor !== "none" ? ", " + RULES.armors[d.armor].name : ""}${d.shield ? ", shield" : ""}</div>`;
+    $("#hero-name").oninput = e => { d.name = e.target.value; };
+    $("#hero-story").oninput = e => { d.backstory = e.target.value; };
+    const eg = $("#eg");
+    const defaultEmoji = RULES.species[d.species].emoji;
+    if (!d.emojiPicked) d.emoji = defaultEmoji;
+    for (const em of RULES.emojiChoices) {
+      const o = document.createElement("div");
+      o.className = "emoji-opt" + (d.emoji === em ? " sel" : "");
+      o.textContent = em;
+      o.onclick = () => { d.emoji = em; d.emojiPicked = true; eg.querySelectorAll(".emoji-opt").forEach(x => x.classList.remove("sel")); o.classList.add("sel"); };
+      eg.appendChild(o);
+    }
+  },
+  finalAbilities() {
+    const d = this.draft;
+    const bonus = RULES.species[d.species]?.bonus || {};
+    const out = {};
+    for (const a of RULES.abilities) {
+      let base;
+      if (d.method === "pointbuy") base = d.abilities[a];
+      else {
+        const pool = d.method === "array" ? RULES.standardArray : d.rolled;
+        base = d.arrayAssign[a] != null ? pool[d.arrayAssign[a]] : 8;
+      }
+      out[a] = base + (bonus[a] || 0);
+    }
+    return out;
+  },
+  finish() {
+    const d = this.draft;
+    const k = RULES.classes[d.klass];
+    const c = {
+      id: uid(), name: d.name.trim(), emoji: d.emoji,
+      species: d.species, klass: d.klass, level: 1, xp: 0,
+      abilities: this.finalAbilities(),
+      skills: [...d.skills],
+      weapons: [...d.weapons], armor: d.armor || "none", shield: !!d.shield,
+      inventory: [...RULES.gear], gold: 10,
+      backstory: d.backstory.trim(),
+      spells: [],
+    };
+    if (k.caster && k.spellList) c.spells = k.spellList.filter(id => RULES.spells[id].tier === 1).slice(0, k.klass === "ranger" ? 2 : 4);
+    if (c.klass === "ranger") c.spells = [];
+    c.speed = RULES.species[c.species].speed;
+    c.maxHp = Characters.maxHp(c); c.hp = c.maxHp;
+    c.maxMana = Characters.maxMana(c); c.mana = c.maxMana;
+    S.party.push(c);
+    Modal.close();
+    Tokens.spawnCharacter(c);
+    Characters.renderParty();
+    Board.draw();
+    Chat.system(`⚔️ <b>${esc(c.name)}</b> the ${RULES.species[c.species].name} ${k.name} joins the party!`);
+    saveSoon();
+    App.switchTab("party");
+  },
+};
+
+/* ============================================================
+   CHARACTER SHEET
+   ============================================================ */
+const Sheet = {
+  open(c) {
+    if (!c) return;
+    const k = RULES.classes[c.klass], sp = RULES.species[c.species];
+    const tok = Tokens.forChar(c);
+    const conds = tok ? tok.conditions : [];
+    const statPills = RULES.abilities.map(a => `
+      <div class="stat-pill"><div class="sp-l">${a}</div><div class="sp-v">${c.abilities[a]}</div><div class="sp-m">${fmtMod(Characters.mod(c, a))}</div></div>`).join("");
+    const skillRows = Object.entries(RULES.skills).map(([id, sk]) => {
+      const m = Characters.skillMod(c, id);
+      return `<div class="roll-row"><span class="rr-name">${c.skills.includes(id) ? "● " : "○ "}${sk.name} <small style="opacity:.5">(${sk.ab.toUpperCase()})</small></span>
+        <span class="rr-mod">${fmtMod(m)}</span><button data-roll="skill" data-id="${id}">Roll</button></div>`;
+    }).join("");
+    const weaponRows = c.weapons.map(wid => {
+      const w = RULES.weapons[wid];
+      return `<div class="roll-row"><span class="rr-name">${w.emoji} ${w.name} <small style="opacity:.5">${Characters.damageExpr(c, w)} · ${w.range > 1 ? "range " + w.range : "melee"}</small></span>
+        <span class="rr-mod">${fmtMod(Characters.attackBonus(c, w))}</span><button data-roll="atk" data-id="${wid}">Attack</button></div>`;
+    }).join("");
+    const spellRows = Characters.knownSpells(c).map(s => `
+      <div class="roll-row"><span class="rr-name">✨ ${s.name} <small style="opacity:.5">tier ${s.tier} · ${s.cost} mana · ${s.desc}</small></span>
+        <button data-roll="spell" data-id="${s.id}" ${c.mana < s.cost ? "disabled" : ""}>Cast</button></div>`).join("");
+    const featureList = [];
+    for (let l = 1; l <= c.level; l++) (k.features[l] || []).forEach(f => featureList.push(f));
+
+    Modal.open({
+      title: `${c.emoji} ${esc(c.name)}`,
+      wide: true,
+      body: `
+        <div class="sheet-head">
+          <div class="pc-portrait">${c.emoji}</div>
+          <div>
+            <div style="font-size:15px;color:var(--gold-bright)">Level ${c.level} ${sp.name} ${k.name}</div>
+            <div style="font-size:12px;color:var(--text-dim);font-family:Verdana">HP ${c.hp}/${c.maxHp}${c.maxMana ? ` · Mana ${c.mana}/${c.maxMana}` : ""} · AC ${Characters.ac(c)} · Speed ${c.speed} sq · Prof +${Characters.prof(c)} · XP ${c.xp || 0}/${c.level < RULES.maxLevel ? RULES.xpToLevel[c.level] : "max"}</div>
+            <div style="margin-top:5px">${conds.map(cd => `<span class="tag cond">${RULES.conditions[cd]?.emoji || ""} ${cd}</span>`).join("")}</div>
+          </div>
+        </div>
+        <div class="sheet-stats">${statPills}</div>
+        <div class="sheet-sec"><h4>⚔️ Attacks</h4>${weaponRows || "<div class='empty-note'>Unarmed.</div>"}</div>
+        ${spellRows ? `<div class="sheet-sec"><h4>✨ Spells <small style="color:var(--text-dim);font-size:10px;font-family:Verdana">DC ${Characters.spellDC(c)} · spell attack ${fmtMod(Characters.spellAtk(c))}</small></h4>${spellRows}</div>` : ""}
+        <div class="sheet-sec"><h4>🎯 Skills</h4>${skillRows}</div>
+        <div class="sheet-sec"><h4>🧬 Features</h4><div class="inv-list">${featureList.map(f => "• " + esc(f)).join("<br>")}<br>${sp.traits.map(t => "• " + esc(t)).join("<br>")}</div></div>
+        <div class="sheet-sec"><h4>🎒 Inventory</h4><div class="inv-list">${c.inventory.map(esc).join(", ")} · <b>${c.gold} gold</b></div></div>
+        ${c.backstory ? `<div class="sheet-sec"><h4>📖 Backstory</h4><div class="inv-list"><em>${esc(c.backstory)}</em></div></div>` : ""}
+      `,
+      foot: `<button class="m-btn" id="sheet-rest">🏕 Long Rest</button>
+             <button class="m-btn" id="sheet-delete" style="border-color:#7a3a32;color:#e0a29a">Retire Hero</button>
+             <button class="m-btn primary" id="sheet-close">Close</button>`,
+    });
+    $("#sheet-close").onclick = () => Modal.close();
+    $("#sheet-rest").onclick = () => {
+      c.hp = c.maxHp; c.mana = c.maxMana;
+      const t = Tokens.forChar(c); if (t) { t.hp = c.hp; t.conditions = []; }
+      Chat.system(`🏕 <b>${esc(c.name)}</b> takes a long rest — fully restored.`);
+      App.renderAll(); this.open(c);
+    };
+    $("#sheet-delete").onclick = () => {
+      if (!confirm(`Retire ${c.name}? This removes them from the party.`)) return;
+      const t = Tokens.forChar(c); if (t) Tokens.remove(t.id);
+      S.party = S.party.filter(x => x.id !== c.id);
+      Modal.close(); App.renderAll(); saveSoon();
+    };
+    $$("#modal-veil [data-roll]").forEach(btn => btn.onclick = () => {
+      const kind = btn.dataset.roll, id = btn.dataset.id;
+      if (kind === "skill") {
+        const m = Characters.skillMod(c, id);
+        Dice.post(`1d20${m >= 0 ? "+" + m : m}`, { who: c.name, reason: RULES.skills[id].name + " check" });
+      } else if (kind === "atk") {
+        Modal.close();
+        Combat.playerAttack(c, id);
+      } else if (kind === "spell") {
+        Modal.close();
+        Combat.playerCast(c, id);
+      }
+    });
+  },
+};
+
+/* ============================================================
+   COMBAT ENGINE
+   ============================================================ */
+const Combat = {
+  dist(a, b) { return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)); },
+  currentToken() {
+    if (!S.combat.active || !S.combat.order.length) return null;
+    return Tokens.get(S.combat.order[S.combat.turn]);
+  },
+  moveLeft() {
+    const tok = this.currentToken();
+    if (!tok) return 0;
+    return Math.max(0, tok.speed - S.combat.moved);
+  },
+  spendMove(cost) { S.combat.moved += cost; },
+
+  start() {
+    const combatants = S.tokens.filter(t => !t.dead && (t.team === "party" || t.team === "enemy"));
+    if (!combatants.some(t => t.team === "party") || !combatants.some(t => t.team === "enemy")) {
+      Chat.system("Combat needs at least one party member and one enemy on the board."); return false;
+    }
+    for (const t of combatants) {
+      let dexMod = 0;
+      if (t.charId) dexMod = Characters.mod(Characters.get(t.charId), "dex");
+      else if (t.monsterId) dexMod = RULES.monsters[t.monsterId]?.mods.dex || 0;
+      t.init = Dice.roll("1d20").total + dexMod;
+      t.usedTraits = {};
+    }
+    combatants.sort((a, b) => b.init - a.init);
+    S.combat = { active: true, order: combatants.map(t => t.id), turn: 0, round: 1, moved: 0, actionUsed: false, quickUsed: false };
+    Chat.system(`⚔️ <b>Combat begins!</b> Initiative: ${combatants.map(t => `${t.emoji}${esc(t.name)} (${t.init})`).join(", ")}`);
+    this.announceTurn();
+    App.renderAll();
+    App.switchTab("combat");
+    saveSoon();
+    return true;
+  },
+  end(reason = "") {
+    S.combat = { active: false, order: [], turn: 0, round: 0, moved: 0, actionUsed: false, quickUsed: false };
+    S.tokens.forEach(t => { t.init = null; });
+    Chat.system(`🕊 <b>Combat ends.</b> ${esc(reason)}`);
+    $("#turn-banner").classList.add("hidden");
+    App.renderAll(); saveSoon();
+  },
+  checkVictory() {
+    if (!S.combat.active) return;
+    const foes = S.tokens.filter(t => t.team === "enemy" && !t.dead);
+    if (!foes.length) {
+      const xpEach = Math.round(S.tokens.filter(t => t.team === "enemy" && t.dead)
+        .reduce((sum, t) => sum + (RULES.monsters[t.monsterId]?.threat || 0.5) * 100, 0) / Math.max(1, S.party.length));
+      this.end("The enemies are defeated!");
+      if (xpEach > 0) {
+        S.party.forEach(c => Characters.awardXp(c, xpEach));
+        Chat.system(`Each hero gains <b>${xpEach} XP</b>.`);
+      }
+      // clean up corpses after victory
+      S.tokens.filter(t => t.dead && t.team === "enemy").forEach(t => Tokens.remove(t.id));
+      App.renderAll();
+    }
+    const heroes = S.tokens.filter(t => t.team === "party" && t.hp > 0);
+    if (!heroes.length && S.combat.active) {
+      this.end("The party has fallen…");
+      Chat.dm("Darkness closes in. The tale pauses here — heal your heroes or begin anew.");
+    }
+  },
+  nextTurn() {
+    if (!S.combat.active) return;
+    const n = S.combat.order.length;
+    for (let i = 0; i < n; i++) {
+      S.combat.turn = (S.combat.turn + 1) % n;
+      if (S.combat.turn === 0) S.combat.round++;
+      const tok = this.currentToken();
+      if (tok && !tok.dead) {
+        // expire simple one-round conditions
+        if (tok.conditions.includes("shielded")) Tokens.setCondition(tok, "shielded", false);
+        if (tok.conditions.includes("stunned") && Math.random() < 0.5) Tokens.setCondition(tok, "stunned", false);
+        break;
+      }
+    }
+    S.combat.moved = 0; S.combat.actionUsed = false; S.combat.quickUsed = false;
+    this.announceTurn();
+    App.renderAll(); saveSoon();
+  },
+  announceTurn() {
+    const tok = this.currentToken();
+    if (!tok) return;
+    const banner = $("#turn-banner");
+    banner.classList.remove("hidden");
+    banner.innerHTML = `Round ${S.combat.round} — <b>${tok.emoji} ${esc(tok.name)}</b>'s turn` +
+      `<div class="tb-sub">${tok.team === "party" ? "Move by clicking highlighted squares · act from the Combat tab" : "Enemy turn — press ▶ in the Combat tab (or let the DM run it)"}</div>`;
+    Board.selected = tok.id;
+    Board.computeMoveRange();
+    Board.draw();
+  },
+
+  /* ---------- attack resolution ---------- */
+  advantageState(attacker, target) {
+    let adv = false, dis = false;
+    const ac = attacker.conditions, tc = target.conditions;
+    if (ac.includes("invisible")) adv = true;
+    if (ac.includes("poisoned") || ac.includes("prone") || ac.includes("frightened") || ac.includes("mocked")) dis = true;
+    if (tc.includes("stunned") || tc.includes("restrained")) adv = true;
+    if (tc.includes("invisible")) dis = true;
+    if (tc.includes("prone") && this.dist(attacker, target) <= 1) adv = true;
+    // pack tactics style: ally adjacent to target
+    const allyAdjacent = S.tokens.some(t => t !== attacker && !t.dead && t.team === attacker.team && this.dist(t, target) <= 1);
+    if (attacker.monsterId && (RULES.monsters[attacker.monsterId]?.traits || []).some(t => t.includes("Pack Tactics")) && allyAdjacent) adv = true;
+    if (adv && dis) return {};
+    return { adv, dis, allyAdjacent };
+  },
+  resolveAttack({ attacker, target, name, bonus, dmgExpr, dmgType = "", effect = null, tags = {} }) {
+    const { adv, dis, allyAdjacent } = this.advantageState(attacker, target);
+    let atkExpr = `1d20${bonus >= 0 ? "+" + bonus : bonus}`;
+    if (attacker.conditions.includes("blessed")) atkExpr += "+1d4";
+    const roll = Dice.post(atkExpr, { who: attacker.name, reason: `${name} vs ${target.name} (AC ${target.ac})`, adv, dis, vs: target.ac });
+    if (!roll) return;
+    if (attacker.conditions.includes("mocked")) Tokens.setCondition(attacker, "mocked", false);
+    const critAt = tags.critRange || 20;
+    const isCrit = roll.d20 !== null && roll.d20 >= critAt;
+    if (roll.d20 === 1 || (!isCrit && roll.total < target.ac)) {
+      Chat.system(`${attacker.emoji} ${esc(attacker.name)}'s ${esc(name)} <b>misses</b> ${target.emoji} ${esc(target.name)}.`);
+      return false;
+    }
+    let dmg = dmgExpr;
+    if (isCrit) dmg = dmg.replace(/(\d+)d(\d+)/g, (m, n, f) => (parseInt(n) * 2) + "d" + f);
+    // rogue sneak attack
+    if (tags.char && tags.char.klass === "rogue" && (adv || allyAdjacent)) {
+      dmg += tags.char.level >= 3 ? "+2d6" : "+1d6";
+      Chat.system(`🗡 Sneak attack!`);
+    }
+    // hunter's mark
+    if (tags.char && target.conditions.includes("marked")) dmg += "+1d6";
+    const dr = Dice.roll(dmg);
+    Tokens.applyDamage(target, dr.total, dmgType + (isCrit ? " (CRIT)" : ""));
+    if (effect && target.hp > 0) Tokens.setCondition(target, effect, true);
+    return true;
+  },
+
+  /* ---------- player actions ---------- */
+  ensurePlayerCanAct(c) {
+    const tok = Tokens.forChar(c);
+    if (!tok) { Chat.system(`${esc(c.name)} has no token on the board.`); return null; }
+    if (S.combat.active) {
+      const cur = this.currentToken();
+      if (!cur || cur.id !== tok.id) { Chat.system(`It isn't ${esc(c.name)}'s turn.`); return null; }
+      if (S.combat.actionUsed) { Chat.system("Action already used this turn."); return null; }
+      if (tok.conditions.includes("stunned")) { Chat.system(`${esc(c.name)} is stunned and cannot act!`); return null; }
+    }
+    return tok;
+  },
+  playerAttack(c, weaponId) {
+    const tok = this.ensurePlayerCanAct(c);
+    if (!tok) return;
+    const w = RULES.weapons[weaponId];
+    App.switchTab("combat");
+    Board.startTargeting({
+      prompt: `🎯 Click a target for ${c.name}'s ${w.name} (${w.range > 1 ? "range " + w.range : "melee"})…`,
+      origin: tok,
+      cb: cell => {
+        const target = Board.tokenAt(cell.x, cell.y);
+        if (!target || target.dead) { Chat.system("No target there."); return; }
+        if (target.team === "party" && !confirm(`Attack your ally ${target.name}?!`)) return;
+        const d = this.dist(tok, target);
+        const maxRange = Math.max(w.range, w.thrown || 0);
+        if (d > maxRange) { Chat.system(`Out of range (${d} > ${maxRange} squares).`); return; }
+        let tags = { char: c };
+        if (c.klass === "fighter" && c.level >= 3) tags.critRange = 19;
+        this.resolveAttack({ attacker: tok, target, name: w.name, bonus: Characters.attackBonus(c, w),
+          dmgExpr: Characters.damageExpr(c, w), dmgType: "", tags });
+        // extra attack at level 5
+        const extraAttack = (c.klass === "fighter" || c.klass === "ranger") && c.level >= 5;
+        if (extraAttack && !tok.usedTraits.extraAttackDone && S.combat.active) {
+          tok.usedTraits.extraAttackDone = true;
+          Chat.system(`${esc(c.name)} can attack once more this action (use Attack again).`);
+        } else if (S.combat.active) {
+          tok.usedTraits.extraAttackDone = false;
+          S.combat.actionUsed = true;
+        }
+        App.renderCombat(); saveSoon();
+      },
+    });
+  },
+  playerCast(c, spellId) {
+    const s = RULES.spells[spellId];
+    if (!s) return;
+    const tok = this.ensurePlayerCanAct(c);
+    if (!tok) return;
+    if (c.mana < s.cost) { Chat.system("Not enough mana."); return; }
+    if (s.tier > Characters.maxSpellTier(c)) { Chat.system("Spell tier too high for your level."); return; }
+
+    const finish = () => {
+      c.mana -= s.cost;
+      if (S.combat.active) S.combat.actionUsed = true;
+      App.renderAll(); saveSoon();
+    };
+    const casterMods = { dc: Characters.spellDC(c), atk: Characters.spellAtk(c) };
+
+    if (s.shape === "self") {
+      Chat.system(`✨ <b>${esc(c.name)}</b> casts <b>${s.name}</b>!`);
+      if (s.effect?.teleport) {
+        Board.startTargeting({ prompt: "Teleport where?", origin: tok, cb: cell => {
+          if (Math.max(Math.abs(cell.x - tok.x), Math.abs(cell.y - tok.y)) > s.range) { Chat.system("Too far."); return; }
+          const terr = TERRAIN_BY_ID[S.map.terrain[cell.y * S.map.w + cell.x]];
+          if (!terr.pass || Board.tokenAt(cell.x, cell.y)) { Chat.system("Blocked."); return; }
+          tok.x = cell.x; tok.y = cell.y;
+          Board.revealAround(cell.x, cell.y, 6);
+          finish(); Board.draw();
+        }});
+        return;
+      }
+      if (s.effect?.reveal) Board.revealAround(tok.x, tok.y, s.effect.reveal);
+      if (s.effect?.condition) Tokens.setCondition(tok, s.effect.condition, true);
+      if (s.shape === "cone" || s.radius) { /* handled below via targeting */ }
+      finish(); return;
+    }
+
+    const radius = s.radius || 0;
+    Board.startTargeting({
+      prompt: `✨ Click ${radius ? "the center of" : "a target for"} ${s.name} (range ${s.range || "touch"})…`,
+      origin: tok, radius,
+      cb: cell => {
+        const d = Math.max(Math.abs(cell.x - tok.x), Math.abs(cell.y - tok.y));
+        if (s.range > 0 && d > s.range) { Chat.system(`Out of range (${d} > ${s.range}).`); return; }
+        Chat.system(`✨ <b>${esc(c.name)}</b> casts <b>${s.name}</b>!`);
+        let targets = [];
+        if (radius) {
+          targets = S.tokens.filter(t => !t.dead && Math.max(Math.abs(t.x - cell.x), Math.abs(t.y - cell.y)) <= radius);
+          if (s.allies || s.heal) targets = targets.filter(t => s.allies ? t.team === "party" : true);
+          if (s.damage && !s.heal) targets = targets.filter(t => t.team !== "party" || confirm(`${s.name} will also hit ${t.name}! Include allies?`));
+        } else {
+          const target = Board.tokenAt(cell.x, cell.y);
+          if (!target || target.dead) {
+            if (s.revive) {
+              const corpse = S.tokens.find(t => t.dead && t.x === cell.x && t.y === cell.y);
+              if (corpse) { corpse.dead = false; Tokens.heal(corpse, 1); finish(); return; }
+            }
+            Chat.system("No target there."); return;
+          }
+          targets = [target];
+        }
+        if (!targets.length) { Chat.system("No creatures in the area."); finish(); return; }
+        this.applySpell({ caster: tok, casterChar: c, spell: s, targets, casterMods });
+        finish();
+      },
+    });
+  },
+  applySpell({ caster, casterChar, spell: s, targets, casterMods }) {
+    for (const target of targets) {
+      if (s.heal) {
+        let healExpr = String(s.heal);
+        if (casterChar?.klass === "cleric" && casterChar.level >= 5) healExpr += "+2";
+        const hr = Dice.roll(healExpr) || { total: parseInt(s.heal) || 1 };
+        Tokens.heal(target, hr.total);
+        if (s.effect?.condition) Tokens.setCondition(target, s.effect.condition, true);
+        continue;
+      }
+      if (s.kind === "attack") {
+        this.resolveAttack({ attacker: caster, target, name: s.name, bonus: casterMods.atk,
+          dmgExpr: this.empower(casterChar, s.damage), dmgType: s.dmgType, effect: s.effect?.condition, tags: {} });
+      } else if (s.kind === "save") {
+        const saveMod = this.saveMod(target, s.save);
+        const roll = Dice.post(`1d20${saveMod >= 0 ? "+" + saveMod : saveMod}`,
+          { who: target.name, reason: `${s.save.toUpperCase()} save vs ${s.name}`, vs: casterMods.dc });
+        const failed = roll.total < casterMods.dc && roll.d20 !== 20;
+        if (failed) {
+          if (s.damage) Tokens.applyDamage(target, Dice.roll(this.empower(casterChar, s.damage)).total, s.dmgType);
+          if (s.effect?.condition && target.hp > 0) Tokens.setCondition(target, s.effect.condition, true);
+        } else if (s.half && s.damage) {
+          Tokens.applyDamage(target, Math.floor(Dice.roll(s.damage).total / 2), s.dmgType + " (half)");
+        } else {
+          Chat.system(`${target.emoji} ${esc(target.name)} resists ${s.name}.`);
+        }
+      } else { // auto
+        if (s.damage) Tokens.applyDamage(target, Dice.roll(this.empower(casterChar, s.damage)).total, s.dmgType);
+        if (s.effect?.condition) Tokens.setCondition(target, s.effect.condition, true);
+      }
+    }
+  },
+  empower(c, dmgExpr) {
+    if (c && c.klass === "mage" && c.level >= 5 && dmgExpr) {
+      return dmgExpr.replace(/^(\d+)d(\d+)/, (m, n, f) => (parseInt(n) + 1) + "d" + f);
+    }
+    return dmgExpr;
+  },
+  saveMod(tok, ability) {
+    if (tok.charId) {
+      const c = Characters.get(tok.charId);
+      let m = Characters.mod(c, ability);
+      if (RULES.classes[c.klass].saves.includes(ability)) m += Characters.prof(c);
+      if (tok.conditions.includes("blessed")) m += 2;
+      return m;
+    }
+    const mon = RULES.monsters[tok.monsterId];
+    return mon ? (mon.mods[ability] ?? 0) : 0;
+  },
+
+  /* ---------- enemy auto-turn (simple AI, no API needed) ---------- */
+  runEnemyTurn() {
+    const tok = this.currentToken();
+    if (!tok || tok.team !== "enemy" || tok.dead) { this.nextTurn(); return; }
+    if (tok.conditions.includes("stunned") || tok.conditions.includes("restrained")) {
+      Chat.system(`${tok.emoji} ${esc(tok.name)} struggles helplessly.`);
+      this.nextTurn(); return;
+    }
+    const mon = RULES.monsters[tok.monsterId];
+    const heroes = S.tokens.filter(t => t.team === "party" && !t.dead && t.hp > 0);
+    if (!heroes.length) { this.nextTurn(); return; }
+    // nearest hero
+    heroes.sort((a, b) => this.dist(tok, a) - this.dist(tok, b));
+    const target = heroes[0];
+    const attacks = mon ? mon.attacks : [{ name: "Strike", bonus: 3, damage: "1d6+1", range: 1 }];
+    // choose attack: ranged if far, melee if close
+    let d = this.dist(tok, target);
+    let attack = attacks.find(a => a.range >= d) || attacks[0];
+    // move toward target if out of range
+    if (d > attack.range) {
+      Board.selected = tok.id;
+      Board.computeMoveRange();
+      let best = null, bestD = d;
+      if (Board.moveRange) for (const key of Board.moveRange.keys()) {
+        const [x, y] = key.split(",").map(Number);
+        const nd = Math.max(Math.abs(x - target.x), Math.abs(y - target.y));
+        if (nd < bestD || (nd === bestD && best === null)) { bestD = nd; best = { x, y }; }
+      }
+      if (best) { tok.x = best.x; tok.y = best.y; d = bestD; Chat.system(`${tok.emoji} ${esc(tok.name)} advances.`); }
+      attack = attacks.find(a => a.range >= d) || attack;
+    }
+    if (d <= attack.range) {
+      const times = attack.multi || 1;
+      for (let i = 0; i < times && target.hp > 0; i++) {
+        this.resolveAttack({ attacker: tok, target, name: attack.name, bonus: attack.bonus,
+          dmgExpr: attack.damage, dmgType: "", effect: attack.effect || null, tags: {} });
+      }
+    } else {
+      Chat.system(`${tok.emoji} ${esc(tok.name)} can't reach anyone this round.`);
+    }
+    Board.draw();
+    this.nextTurn();
+  },
+
+  /* ---------- combat UI ---------- */
+  renderPanel() {
+    const initList = $("#init-list");
+    const panel = $("#action-panel");
+    $("#btn-start-combat").classList.toggle("hidden", S.combat.active);
+    $("#btn-end-combat").classList.toggle("hidden", !S.combat.active);
+    if (!S.combat.active) {
+      initList.innerHTML = "";
+      panel.innerHTML = `<div class="empty-note">No combat active.<br>Position your heroes and enemies on the board, then start combat to roll initiative.</div>`;
+      $("#turn-banner").classList.add("hidden");
+      return;
+    }
+    initList.innerHTML = S.combat.order.map((id, i) => {
+      const t = Tokens.get(id);
+      if (!t) return "";
+      return `<div class="init-row ${i === S.combat.turn ? "current" : ""} ${t.team} ${t.dead ? "dead" : ""}" data-id="${t.id}">
+        <span class="init">${t.init}</span><span class="emoji">${t.dead ? "💀" : t.emoji}</span>
+        <span class="nm">${esc(t.name)}</span>
+        <span class="hp">${t.hp}/${t.maxHp}</span>
+        ${t.conditions.map(c => RULES.conditions[c]?.emoji || "").join("")}
+      </div>`;
+    }).join("");
+    initList.querySelectorAll(".init-row").forEach(r => r.onclick = () => {
+      Board.selected = r.dataset.id; Board.computeMoveRange(); Board.draw();
+    });
+
+    const tok = this.currentToken();
+    if (!tok) { panel.innerHTML = ""; return; }
+    const c = tok.charId ? Characters.get(tok.charId) : null;
+    const econ = `<div class="econ">
+      <span class="${this.moveLeft() > 0 ? "avail" : ""}">🥾 Move ${this.moveLeft()}/${tok.speed}</span>
+      <span class="${!S.combat.actionUsed ? "avail" : ""}">⚔️ Action</span>
+      <span class="${!S.combat.quickUsed ? "avail" : ""}">⚡ Quick</span>
+    </div>`;
+    if (c) {
+      const weaponBtns = c.weapons.map(w => `<button class="act-btn" data-atk="${w}">${RULES.weapons[w].emoji} ${RULES.weapons[w].name}</button>`).join("");
+      const spellBtns = Characters.knownSpells(c).map(s =>
+        `<button class="act-btn" data-cast="${s.id}" ${c.mana < s.cost || S.combat.actionUsed ? "disabled" : ""}>✨ ${s.name} <small>(${s.cost})</small></button>`).join("");
+      const canSecondWind = c.klass === "fighter" && !tok.usedTraits.secondWind && !S.combat.quickUsed;
+      panel.innerHTML = `<h4>${tok.emoji} ${esc(tok.name)} — Round ${S.combat.round}</h4>${econ}
+        <div class="act-btns">
+          ${weaponBtns}
+          ${spellBtns}
+          <button class="act-btn" data-dash ${S.combat.actionUsed ? "disabled" : ""}>🏃 Dash</button>
+          ${canSecondWind ? `<button class="act-btn" data-secondwind>💪 Second Wind</button>` : ""}
+          <button class="act-btn end" data-endturn>⏭ End Turn</button>
+        </div>
+        <div class="form-hint" style="margin-top:8px">Click a highlighted square on the board to move. Double-click a token for details.</div>`;
+      panel.querySelectorAll("[data-atk]").forEach(b => b.onclick = () => this.playerAttack(c, b.dataset.atk));
+      panel.querySelectorAll("[data-cast]").forEach(b => b.onclick = () => this.playerCast(c, b.dataset.cast));
+      const dashBtn = panel.querySelector("[data-dash]");
+      if (dashBtn) dashBtn.onclick = () => {
+        S.combat.actionUsed = true; S.combat.moved -= tok.speed;
+        Chat.system(`${tok.emoji} ${esc(tok.name)} dashes!`);
+        Board.computeMoveRange(); App.renderCombat(); Board.draw();
+      };
+      const swBtn = panel.querySelector("[data-secondwind]");
+      if (swBtn) swBtn.onclick = () => {
+        tok.usedTraits.secondWind = true; S.combat.quickUsed = true;
+        const r = Dice.post(`1d10+${c.level}`, { who: c.name, reason: "Second Wind" });
+        Tokens.heal(tok, r.total);
+        App.renderCombat();
+      };
+      panel.querySelector("[data-endturn]").onclick = () => this.nextTurn();
+    } else {
+      panel.innerHTML = `<h4>${tok.emoji} ${esc(tok.name)} — Round ${S.combat.round}</h4>${econ}
+        <div class="act-btns">
+          <button class="act-btn" data-enemyauto>▶ Run enemy turn</button>
+          <button class="act-btn end" data-endturn>⏭ Skip</button>
+        </div>
+        <div class="form-hint" style="margin-top:8px">The built-in AI moves the enemy toward the nearest hero and attacks — or the Dungeon Master may narrate its move.</div>`;
+      panel.querySelector("[data-enemyauto]").onclick = () => this.runEnemyTurn();
+      panel.querySelector("[data-endturn]").onclick = () => this.nextTurn();
+    }
+  },
+};
+
+/* ============================================================
+   AI DUNGEON MASTER
+   Claude Messages API from the browser, with structured tools
+   gated by an autonomy dial: narrator | codm | full.
+   ============================================================ */
+const DM = {
+  busy: false,
+  undoSnapshot: null,
+
+  /* ---------- tool definitions (Claude tool schemas) ---------- */
+  tools: [
+    { name: "roll_dice",
+      description: "Roll dice openly. Use for anything the DM rolls: monster attacks, saves, random tables, skill contests. Player-facing checks should use request_player_roll instead.",
+      input_schema: { type: "object", properties: {
+        expression: { type: "string", description: "Dice expression, e.g. '1d20+5' or '2d6'" },
+        reason: { type: "string", description: "What the roll is for" },
+        dc: { type: "integer", description: "Optional DC/target to compare against" } },
+        required: ["expression"] } },
+    { name: "request_player_roll",
+      description: "Ask a player character to make a skill check or saving throw. The player rolls it themselves; you receive the result.",
+      input_schema: { type: "object", properties: {
+        character: { type: "string", description: "Character name" },
+        skill: { type: "string", description: "One of the 12 skills, or an ability (str/dex/con/int/wis/cha) for a save" },
+        dc: { type: "integer" },
+        reason: { type: "string" } },
+        required: ["character", "skill", "dc"] } },
+    { name: "spawn_token",
+      description: "Place a creature or NPC token on the map. Use monster_id for bestiary monsters (stats auto-fill). For custom NPCs, give hp/ac/speed. Position is auto-adjusted to the nearest free floor cell.",
+      input_schema: { type: "object", properties: {
+        name: { type: "string" },
+        monster_id: { type: "string", description: "Bestiary id, e.g. 'goblin', 'skeleton', 'young_dragon'" },
+        emoji: { type: "string" },
+        team: { type: "string", enum: ["enemy", "neutral", "party"] },
+        x: { type: "integer" }, y: { type: "integer" },
+        count: { type: "integer", description: "Spawn several at once (default 1, max 8)" },
+        hp: { type: "integer" }, ac: { type: "integer" }, speed: { type: "integer" } },
+        required: ["name", "x", "y"] } },
+    { name: "move_token",
+      description: "Move a token to a new position on the map.",
+      input_schema: { type: "object", properties: {
+        token: { type: "string", description: "Token name" },
+        x: { type: "integer" }, y: { type: "integer" } },
+        required: ["token", "x", "y"] } },
+    { name: "remove_token",
+      description: "Remove a token from the map (fled, despawned, or story reasons).",
+      input_schema: { type: "object", properties: { token: { type: "string" } }, required: ["token"] } },
+    { name: "apply_damage",
+      description: "Deal damage to a token (after you rolled it with roll_dice).",
+      input_schema: { type: "object", properties: {
+        token: { type: "string" }, amount: { type: "integer" }, type: { type: "string", description: "e.g. fire, slashing" } },
+        required: ["token", "amount"] } },
+    { name: "heal_token",
+      description: "Restore HP to a token.",
+      input_schema: { type: "object", properties: { token: { type: "string" }, amount: { type: "integer" } }, required: ["token", "amount"] } },
+    { name: "set_condition",
+      description: "Apply or remove a condition: prone, poisoned, stunned, restrained, frightened, invisible, blessed, shielded, slowed, marked, charmed, mocked.",
+      input_schema: { type: "object", properties: {
+        token: { type: "string" }, condition: { type: "string" }, active: { type: "boolean", description: "true to apply (default), false to remove" } },
+        required: ["token", "condition"] } },
+    { name: "reveal_area",
+      description: "Lift fog of war around a point (when the party sees a new area).",
+      input_schema: { type: "object", properties: {
+        x: { type: "integer" }, y: { type: "integer" }, radius: { type: "integer", description: "default 6" } },
+        required: ["x", "y"] } },
+    { name: "generate_dungeon",
+      description: "Replace the current map with a freshly generated dungeon (rooms + corridors, fogged). The party is placed in the first room. Use when the story moves to a new location.",
+      input_schema: { type: "object", properties: {
+        rooms: { type: "integer", description: "3-14, default 7" },
+        width: { type: "integer" }, height: { type: "integer" },
+        seed: { type: "string", description: "Optional seed for reproducibility" },
+        theme: { type: "string", enum: ["dungeon", "volcanic"] } } } },
+    { name: "paint_terrain",
+      description: "Paint a rectangle of terrain on the map. Types: void, floor, wall, door, water, lava, difficult, grass.",
+      input_schema: { type: "object", properties: {
+        terrain: { type: "string" },
+        x: { type: "integer" }, y: { type: "integer" },
+        w: { type: "integer", description: "width, default 1" }, h: { type: "integer", description: "height, default 1" } },
+        required: ["terrain", "x", "y"] } },
+    { name: "start_combat",
+      description: "Roll initiative and begin tactical combat with all party and enemy tokens on the map.",
+      input_schema: { type: "object", properties: {} } },
+    { name: "end_combat",
+      description: "End the current combat encounter.",
+      input_schema: { type: "object", properties: { reason: { type: "string" } } } },
+    { name: "award",
+      description: "Grant experience, gold, or items to the party (or one character).",
+      input_schema: { type: "object", properties: {
+        xp: { type: "integer", description: "XP per character" },
+        gold: { type: "integer" },
+        items: { type: "array", items: { type: "string" } },
+        character: { type: "string", description: "Optional: only this character" } } } },
+    { name: "update_quest",
+      description: "Update the quest log — record objectives, discoveries, and major story beats so they persist.",
+      input_schema: { type: "object", properties: {
+        title: { type: "string", description: "Optional new quest title" },
+        entry: { type: "string", description: "Log entry to append" } },
+        required: ["entry"] } },
+  ],
+
+  /* ---------- system prompt ---------- */
+  rulesDigest() {
+    return `FABLE d20 RULES (summary):
+- Core roll: d20 + ability mod + proficiency (if proficient) vs DC or AC. Advantage/disadvantage = roll twice take best/worst.
+- Abilities: STR DEX CON INT WIS CHA. Mod = (score-10)/2. Proficiency: +2 (lvl 1-4), +3 (lvl 5).
+- Distances in 5-ft squares. Melee = 1 square. Turn = Move (speed) + 1 Action + 1 Quick action.
+- Casters spend mana = spell tier. Spell save DC = 8 + prof + casting mod.
+- Typical DCs: easy 8, medium 12, hard 15, very hard 18.
+- Conditions: prone, poisoned, stunned, restrained, frightened, invisible, blessed, shielded, slowed, marked, charmed, mocked.
+- Monsters available (id: threat): ${Object.entries(RULES.monsters).map(([id, m]) => `${id}(${m.threat})`).join(", ")}. Threat ≈ how many level-1 heroes it challenges; aim total threat ≈ party size × average level for a fair fight.`;
+  },
+  stateDigest() {
+    const lines = [];
+    lines.push(`MAP: ${S.map.w}x${S.map.h} "${S.map.name}". Coordinates are (x,y), 0-indexed, x→right y→down.`);
+    const fogged = S.map.fog.filter(Boolean).length;
+    lines.push(`Fog: ${fogged} of ${S.map.fog.length} cells hidden.`);
+    if (S.party.length) {
+      lines.push("PARTY:");
+      for (const c of S.party) {
+        const tok = Tokens.forChar(c);
+        lines.push(`- ${Characters.summaryLine(c)}${tok ? ` @(${tok.x},${tok.y})` : " (no token)"}${c.backstory ? ` | backstory: ${c.backstory}` : ""}` +
+          (c.spells?.length ? ` | spells: ${c.spells.map(s => RULES.spells[s]?.name).join(", ")}` : ""));
+      }
+    } else lines.push("PARTY: none yet — invite the player to create characters.");
+    const npcs = S.tokens.filter(t => !t.charId);
+    if (npcs.length) {
+      lines.push("OTHER TOKENS:");
+      for (const t of npcs.slice(0, 30))
+        lines.push(`- ${t.name} [${t.team}] @(${t.x},${t.y}) HP ${t.hp}/${t.maxHp} AC ${t.ac}${t.dead ? " DEAD" : ""}${t.conditions.length ? " " + t.conditions.join(",") : ""}`);
+    }
+    if (S.combat.active) {
+      const cur = Combat.currentToken();
+      lines.push(`COMBAT ACTIVE: round ${S.combat.round}, current turn: ${cur ? cur.name : "?"}. Order: ${S.combat.order.map(id => Tokens.get(id)?.name).filter(Boolean).join(" → ")}.`);
+    } else lines.push("No combat active.");
+    if (S.quest.title || S.quest.log.length) {
+      lines.push(`QUEST: ${S.quest.title || "(untitled)"}${S.quest.premise ? " — premise: " + S.quest.premise : ""}`);
+      for (const e of S.quest.log.slice(-12)) lines.push(`  • ${e}`);
+    }
+    return lines.join("\n");
+  },
+  systemPrompt() {
+    const autonomy = S.settings.autonomy;
+    const autonomyNote = {
+      narrator: "AUTONOMY: Narrator mode — your tool calls become suggestions the player applies manually. Narrate richly; suggest board actions sparingly.",
+      codm: "AUTONOMY: Co-DM mode — each tool call is shown to the player for approval before it executes. A denied call is not a failure; adapt gracefully.",
+      full: "AUTONOMY: Full DM mode — your tool calls execute immediately. Drive the board confidently.",
+    }[autonomy];
+    return `You are the Dungeon Master for "Fableboard", a virtual tabletop running the Fable d20 system. You are a warm, vivid, fair storyteller in the tradition of the great tabletop DMs.
+
+${this.rulesDigest()}
+
+HOW TO RUN THE GAME:
+- Narrate in second person, 2-6 sentences per beat. Evocative but never purple. End most turns with a hook or a question: what does the player do?
+- Use tools to make the board match the fiction: spawn monsters when they appear, reveal_area as the party explores, generate_dungeon when entering a new site, start_combat when blades are drawn.
+- Ask for rolls with request_player_roll when outcomes are uncertain and failure is interesting. Roll monster attacks/saves yourself with roll_dice, then apply_damage.
+- During combat, run ONLY the enemy turns (when the state digest says it's an enemy's turn): move_token, roll_dice for attacks vs the target's AC, apply_damage on hits, then narrate. Never take actions for player characters — describe the situation and let them act.
+- Track the story with update_quest at meaningful moments. Award xp/gold/items when earned (a fair fight ≈ 100 XP × total threat, split by the tool automatically per character).
+- Respect established facts in the quest log and conversation. Keep NPCs consistent.
+- Keep the party's actual positions and stats (in the CURRENT STATE below) authoritative — never invent HP totals or positions.
+
+${autonomyNote}
+
+CURRENT STATE:
+${this.stateDigest()}`;
+  },
+
+  /* ---------- API plumbing ---------- */
+  async callClaude(messages) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": S.settings.apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: S.settings.model || "claude-opus-4-8",
+        max_tokens: 4096,
+        system: this.systemPrompt(),
+        tools: this.tools,
+        messages,
+      }),
+    });
+    if (!res.ok) {
+      let detail = "";
+      try { detail = (await res.json()).error?.message || ""; } catch (e) {}
+      const hints = {
+        401: "Check your API key in ⚙️ Settings.",
+        403: "Your key lacks permission for this model.",
+        404: "Unknown model — pick another in ⚙️ Settings.",
+        429: "Rate limited — wait a moment and try again.",
+        529: "The API is overloaded — try again shortly.",
+      };
+      throw new Error(`API error ${res.status}: ${esc(detail)} ${hints[res.status] || ""}`);
+    }
+    return res.json();
+  },
+
+  status(text, thinking = false) {
+    $("#dm-status-text").textContent = text;
+    $("#dm-status").classList.toggle("thinking", thinking);
+  },
+
+  trimHistory() {
+    // Keep history bounded. Trim only at user-text boundaries so tool_use/tool_result pairs stay intact.
+    const msgs = S.dmMessages;
+    if (msgs.length <= 40) return;
+    let cut = msgs.length - 30;
+    while (cut > 0 && !(msgs[cut].role === "user" && typeof msgs[cut].content === "string")) cut--;
+    if (cut > 0) {
+      S.dmMessages = msgs.slice(cut);
+      S.quest.log.push("(Earlier events are summarized in this quest log — older dialogue trimmed.)");
+    }
+  },
+
+  /* ---------- main send loop ---------- */
+  async send(userText) {
+    if (this.busy) return;
+    if (!S.settings.mock && !S.settings.apiKey) {
+      Chat.error(`No API key set. Open <b>⚙️ Settings</b> to add your Anthropic API key — or enable <b>Mock DM</b> there to try the tool pipeline offline.`);
+      Settings.open();
+      return;
+    }
+    this.busy = true;
+    $("#chatsend").disabled = true;
+    if (userText != null) {
+      S.dmMessages.push({ role: "user", content: userText });
+    }
+    this.snapshot();
+    try {
+      if (S.settings.mock) await MockDM.run(userText);
+      else await this.loop();
+    } catch (e) {
+      Chat.error(esc(e.message || String(e)));
+      // roll back a dangling user message so a retry is clean
+      const last = S.dmMessages[S.dmMessages.length - 1];
+      if (last && last.role === "user" && typeof last.content === "string") S.dmMessages.pop();
+    } finally {
+      this.busy = false;
+      $("#chatsend").disabled = false;
+      this.status("DM idle");
+      saveSoon();
+    }
+  },
+  async loop() {
+    let rounds = 0;
+    while (rounds++ < 10) {
+      this.status("The DM is thinking…", true);
+      const res = await this.callClaude(S.dmMessages);
+      S.dmMessages.push({ role: "assistant", content: res.content });
+
+      // render text blocks
+      for (const block of res.content) {
+        if (block.type === "text" && block.text.trim()) Chat.dm(block.text.trim());
+      }
+      if (res.stop_reason !== "tool_use") break;
+
+      const toolUses = res.content.filter(b => b.type === "tool_use");
+      this.status("The DM acts on the board…", true);
+      const results = [];
+      for (const tu of toolUses) {
+        const result = await this.gateAndExecute(tu);
+        results.push({ type: "tool_result", tool_use_id: tu.id, content: result });
+      }
+      S.dmMessages.push({ role: "user", content: results });
+      this.trimHistory();
+      saveSoon();
+    }
+  },
+
+  /* ---------- autonomy gate ---------- */
+  async gateAndExecute(tu) {
+    const mode = S.settings.autonomy;
+    const detail = this.describeTool(tu.name, tu.input);
+    if (tu.name === "request_player_roll") {
+      // always goes to the player regardless of autonomy
+      return await this.playerRollCard(tu.input);
+    }
+    if (mode === "full") {
+      const r = this.execute(tu.name, tu.input);
+      Chat.add({ type: "toolcard", tool: detail.title, detail: detail.text, status: "✓ " + r });
+      $("#undo-dm").classList.remove("hidden");
+      return r;
+    }
+    if (mode === "narrator") {
+      Chat.add({ type: "toolcard", tool: "Suggestion: " + detail.title, detail: detail.text,
+        status: "The DM suggests this — apply it manually on the board if you like." });
+      return "Narrator mode: this action was shown to the player as a suggestion only. It was NOT executed — do not assume it happened. Continue narrating.";
+    }
+    // co-dm: approval card
+    return await new Promise(resolve => {
+      const card = document.createElement("div");
+      card.className = "toolcard";
+      card.innerHTML = `<span class="tc-name">🛠 The DM wants to: ${esc(detail.title)}</span>
+        <div class="tc-detail">${esc(detail.text)}</div>
+        <div class="tc-actions"><button class="ok">✓ Allow</button><button class="no">✗ Deny</button></div>`;
+      $("#chatlog").appendChild(card);
+      $("#chatlog").scrollTop = $("#chatlog").scrollHeight;
+      const finish = (allowed) => {
+        card.querySelector(".tc-actions").remove();
+        card.classList.add("resolved");
+        let result;
+        if (allowed) {
+          result = this.execute(tu.name, tu.input);
+          card.insertAdjacentHTML("beforeend", `<div class="tc-status">✓ ${esc(result)}</div>`);
+          S.chat.push({ type: "toolcard", tool: detail.title, detail: detail.text, status: "✓ " + result, t: Date.now() });
+          $("#undo-dm").classList.remove("hidden");
+        } else {
+          result = "The player DENIED this action. Do not retry it; adapt the story.";
+          card.insertAdjacentHTML("beforeend", `<div class="tc-status">✗ Denied</div>`);
+          S.chat.push({ type: "toolcard", tool: detail.title, detail: detail.text, status: "✗ Denied", t: Date.now() });
+        }
+        saveSoon();
+        resolve(result);
+      };
+      card.querySelector(".ok").onclick = () => finish(true);
+      card.querySelector(".no").onclick = () => finish(false);
+    });
+  },
+  playerRollCard(input) {
+    return new Promise(resolve => {
+      const c = S.party.find(p => p.name.toLowerCase().includes(String(input.character || "").toLowerCase())) || S.party[0];
+      if (!c) { resolve("No such character in the party."); return; }
+      const skillId = String(input.skill || "").toLowerCase();
+      let mod, label;
+      if (RULES.skills[skillId]) { mod = Characters.skillMod(c, skillId); label = RULES.skills[skillId].name + " check"; }
+      else if (RULES.abilities.includes(skillId)) {
+        mod = Characters.mod(c, skillId);
+        if (RULES.classes[c.klass].saves.includes(skillId)) mod += Characters.prof(c);
+        label = skillId.toUpperCase() + " save";
+      } else { resolve(`Unknown skill "${input.skill}". Use one of: ${Object.keys(RULES.skills).join(", ")} or an ability.`); return; }
+      const card = document.createElement("div");
+      card.className = "toolcard";
+      card.innerHTML = `<span class="tc-name">🎲 ${esc(c.name)}: ${esc(label)} — DC ${input.dc}</span>
+        <div class="tc-detail">${esc(input.reason || "")}</div>
+        <div class="tc-actions"><button class="ok">🎲 Roll d20${fmtMod(mod)}</button></div>`;
+      $("#chatlog").appendChild(card);
+      $("#chatlog").scrollTop = $("#chatlog").scrollHeight;
+      card.querySelector(".ok").onclick = () => {
+        card.querySelector(".tc-actions").remove();
+        card.classList.add("resolved");
+        const r = Dice.post(`1d20${mod >= 0 ? "+" + mod : mod}`, { who: c.name, reason: label, vs: input.dc });
+        const success = r.total >= input.dc;
+        card.insertAdjacentHTML("beforeend", `<div class="tc-status">${success ? "✓ Success" : "✗ Failure"} (${r.total} vs DC ${input.dc})</div>`);
+        S.chat.push({ type: "toolcard", tool: `${c.name}: ${label}`, detail: input.reason || "", status: `${success ? "Success" : "Failure"} — rolled ${r.total} vs DC ${input.dc}`, t: Date.now() });
+        resolve(`${c.name} rolled ${r.total} on the ${label} (DC ${input.dc}): ${success ? "SUCCESS" : "FAILURE"}${r.crit ? " (natural 20!)" : r.fumble ? " (natural 1!)" : ""}`);
+      };
+    });
+  },
+
+  describeTool(name, input) {
+    const i = input || {};
+    switch (name) {
+      case "roll_dice": return { title: `Roll ${i.expression}`, text: i.reason || "" };
+      case "spawn_token": return { title: `Spawn ${i.count > 1 ? i.count + "× " : ""}${i.name}`, text: `${i.monster_id ? "bestiary: " + i.monster_id + ", " : ""}team ${i.team || "enemy"} at (${i.x},${i.y})` };
+      case "move_token": return { title: `Move ${i.token}`, text: `to (${i.x},${i.y})` };
+      case "remove_token": return { title: `Remove ${i.token}`, text: "" };
+      case "apply_damage": return { title: `${i.amount} damage to ${i.token}`, text: i.type || "" };
+      case "heal_token": return { title: `Heal ${i.token} for ${i.amount}`, text: "" };
+      case "set_condition": return { title: `${i.active === false ? "Clear" : "Apply"} ${i.condition} on ${i.token}`, text: "" };
+      case "reveal_area": return { title: `Reveal area`, text: `around (${i.x},${i.y}) radius ${i.radius || 6}` };
+      case "generate_dungeon": return { title: `Generate a new dungeon`, text: `${i.rooms || 7} rooms${i.theme ? ", " + i.theme : ""}${i.seed ? ", seed " + i.seed : ""} — replaces the current map!` };
+      case "paint_terrain": return { title: `Paint ${i.terrain}`, text: `at (${i.x},${i.y}) size ${i.w || 1}×${i.h || 1}` };
+      case "start_combat": return { title: "Start combat", text: "Rolls initiative for everyone on the board" };
+      case "end_combat": return { title: "End combat", text: i.reason || "" };
+      case "award": return { title: "Award the party", text: [i.xp && i.xp + " XP", i.gold && i.gold + " gold", i.items?.length && i.items.join(", ")].filter(Boolean).join(" · ") };
+      case "update_quest": return { title: "Update quest log", text: (i.title ? "“" + i.title + "” — " : "") + (i.entry || "") };
+      default: return { title: name, text: JSON.stringify(i) };
+    }
+  },
+
+  /* ---------- tool execution (one code path shared with the UI) ---------- */
+  execute(name, input) {
+    const i = input || {};
+    try {
+      switch (name) {
+        case "roll_dice": {
+          const r = Dice.post(i.expression, { who: "DM", reason: i.reason || "", vs: i.dc ?? null });
+          if (!r) return `Could not parse "${i.expression}".`;
+          return `Rolled ${i.expression}${i.reason ? " (" + i.reason + ")" : ""}: total ${r.total}${r.d20 ? ` (d20=${r.d20})` : ""}${i.dc != null ? (r.total >= i.dc ? " — SUCCESS vs DC " + i.dc : " — FAILURE vs DC " + i.dc) : ""}.`;
+        }
+        case "spawn_token": {
+          const count = clamp(i.count || 1, 1, 8);
+          const mon = i.monster_id ? RULES.monsters[i.monster_id] : null;
+          const made = [];
+          for (let n = 0; n < count; n++) {
+            const pos = Tokens.findOpenCell(clamp(i.x, 0, S.map.w - 1), clamp(i.y, 0, S.map.h - 1));
+            const tok = Tokens.create({
+              name: i.name, emoji: i.emoji || mon?.emoji || "❓",
+              team: i.team || "enemy", x: pos.x, y: pos.y,
+              hp: i.hp ?? mon?.hp ?? 10, ac: i.ac ?? mon?.ac ?? 10, speed: i.speed ?? mon?.speed ?? 6,
+              monsterId: i.monster_id || null,
+            });
+            made.push(`${tok.name}@(${tok.x},${tok.y})`);
+          }
+          App.renderAll();
+          return `Spawned: ${made.join(", ")}.`;
+        }
+        case "move_token": {
+          const tok = Tokens.byName(i.token);
+          if (!tok) return `No token named "${i.token}". Tokens: ${S.tokens.map(t => t.name).join(", ")}.`;
+          tok.x = clamp(i.x, 0, S.map.w - 1); tok.y = clamp(i.y, 0, S.map.h - 1);
+          if (tok.team === "party") Board.revealAround(tok.x, tok.y, 6);
+          Board.draw();
+          return `${tok.name} moved to (${tok.x},${tok.y}).`;
+        }
+        case "remove_token": {
+          const tok = Tokens.byName(i.token);
+          if (!tok) return `No token named "${i.token}".`;
+          Tokens.remove(tok.id); App.renderAll();
+          return `${tok.name} removed.`;
+        }
+        case "apply_damage": {
+          const tok = Tokens.byName(i.token);
+          if (!tok) return `No token named "${i.token}".`;
+          Tokens.applyDamage(tok, i.amount, i.type || "");
+          return `${tok.name} took ${i.amount} damage — now ${tok.hp}/${tok.maxHp} HP${tok.hp === 0 ? (tok.team === "party" ? " (DOWN and dying)" : " (DEAD)") : ""}.`;
+        }
+        case "heal_token": {
+          const tok = Tokens.byName(i.token);
+          if (!tok) return `No token named "${i.token}".`;
+          Tokens.heal(tok, i.amount);
+          return `${tok.name} healed — now ${tok.hp}/${tok.maxHp} HP.`;
+        }
+        case "set_condition": {
+          const tok = Tokens.byName(i.token);
+          if (!tok) return `No token named "${i.token}".`;
+          const ok = Tokens.setCondition(tok, i.condition, i.active !== false);
+          return ok ? `${tok.name}: ${i.condition} ${i.active === false ? "removed" : "applied"}.` : `Unknown condition "${i.condition}".`;
+        }
+        case "reveal_area": {
+          Board.revealAround(clamp(i.x, 0, S.map.w - 1), clamp(i.y, 0, S.map.h - 1), i.radius || 6);
+          return `Revealed radius ${i.radius || 6} around (${i.x},${i.y}).`;
+        }
+        case "generate_dungeon": {
+          const res = Dungeon.generate({ rooms: i.rooms || 7, w: i.width, h: i.height, seed: i.seed, theme: i.theme || "dungeon" });
+          const rooms = res.rooms.map((r, n) => `room${n + 1}@(${r.cx},${r.cy})${r.w}x${r.h}`).join(", ");
+          App.renderAll();
+          return `New dungeon generated (${S.map.w}x${S.map.h}). Party placed in room 1. Rooms: ${rooms}. Everything is fogged except the first room — reveal as they explore, and consider spawning inhabitants in the other rooms.`;
+        }
+        case "paint_terrain": {
+          const terr = Object.values(TERRAIN).find(t => t.name.toLowerCase() === String(i.terrain).toLowerCase() || (i.terrain === "difficult" && t === TERRAIN.ROUGH));
+          const tid = i.terrain === "difficult" ? TERRAIN.ROUGH.id : terr?.id;
+          if (tid == null) return `Unknown terrain "${i.terrain}".`;
+          const w = clamp(i.w || 1, 1, S.map.w), h = clamp(i.h || 1, 1, S.map.h);
+          for (let y = i.y; y < i.y + h; y++) for (let x = i.x; x < i.x + w; x++) {
+            if (x >= 0 && y >= 0 && x < S.map.w && y < S.map.h) S.map.terrain[y * S.map.w + x] = tid;
+          }
+          Board.draw();
+          return `Painted ${i.terrain} at (${i.x},${i.y}) ${w}×${h}.`;
+        }
+        case "start_combat": {
+          if (S.combat.active) return "Combat is already active.";
+          const ok = Combat.start();
+          if (!ok) return "Could not start combat — need at least one party token and one enemy token on the board.";
+          const cur = Combat.currentToken();
+          return `Combat started. Initiative order: ${S.combat.order.map(id => Tokens.get(id)?.name).join(" → ")}. First up: ${cur?.name}${cur?.team === "enemy" ? " (an enemy — run its turn now)" : " (a player — let them act)"}.`;
+        }
+        case "end_combat": {
+          if (!S.combat.active) return "No combat active.";
+          Combat.end(i.reason || "");
+          return "Combat ended.";
+        }
+        case "award": {
+          const targets = i.character ? S.party.filter(c => c.name.toLowerCase().includes(i.character.toLowerCase())) : S.party;
+          if (!targets.length) return "No matching characters.";
+          const notes = [];
+          for (const c of targets) {
+            if (i.xp) { Characters.awardXp(c, i.xp); notes.push(`${c.name}+${i.xp}xp(lvl ${c.level})`); }
+            if (i.gold) { c.gold += i.gold; }
+            if (i.items?.length) c.inventory.push(...i.items);
+          }
+          if (i.gold) Chat.system(`💰 ${targets.map(c => esc(c.name)).join(", ")} gain${targets.length === 1 ? "s" : ""} <b>${i.gold} gold</b>.`);
+          if (i.items?.length) Chat.system(`🎁 Received: <b>${i.items.map(esc).join(", ")}</b>`);
+          App.renderAll();
+          return `Awarded${i.xp ? ` ${i.xp} XP` : ""}${i.gold ? ` ${i.gold} gold` : ""}${i.items?.length ? ` items: ${i.items.join(", ")}` : ""} to ${targets.map(c => c.name).join(", ")}. ${notes.join(" ")}`;
+        }
+        case "update_quest": {
+          if (i.title) S.quest.title = i.title;
+          if (i.entry) S.quest.log.push(i.entry);
+          saveSoon();
+          return "Quest log updated.";
+        }
+        default: return `Unknown tool "${name}".`;
+      }
+    } catch (e) {
+      return `Tool error: ${e.message}`;
+    }
+  },
+
+  /* ---------- undo ---------- */
+  snapshot() {
+    this.undoSnapshot = JSON.stringify({ tokens: S.tokens, map: S.map, combat: S.combat, party: S.party });
+  },
+  undo() {
+    if (!this.undoSnapshot) return;
+    const snap = JSON.parse(this.undoSnapshot);
+    S.tokens = snap.tokens; S.map = snap.map; S.combat = snap.combat; S.party = snap.party;
+    this.undoSnapshot = null;
+    $("#undo-dm").classList.add("hidden");
+    Chat.system("↩ Rolled the board back to before the DM's last turn.");
+    App.renderAll(); saveSoon();
+  },
+
+  /* ---------- new adventure ---------- */
+  newAdventure() {
+    Modal.open({
+      title: "✨ New Adventure",
+      body: `
+        <div class="form-row"><label>Premise — what tale shall we tell?</label>
+          <textarea id="adv-premise" placeholder="e.g. A haunted keep looms over the village of Bram's Hollow…"></textarea>
+          <div class="form-hint">Leave blank and the DM will invent one. Your party: ${S.party.length ? S.party.map(c => esc(c.name)).join(", ") : "<b>empty — create characters first!</b>"}</div>
+        </div>
+        <div class="form-row"><label>Or pick a seed</label>
+          <select id="adv-seed">
+            <option value="">— custom / surprise me —</option>
+            <option>The Haunted Keep of Bram's Hollow</option>
+            <option>The Sunken Temple of the Serpent God</option>
+            <option>Goblin Trouble on the King's Road</option>
+            <option>The Necromancer's Winter</option>
+            <option>Dragon Rumors in the Ember Peaks</option>
+          </select>
+        </div>
+        <div class="form-hint">⚠️ Starting a new adventure clears the story log and quest journal (your heroes, maps, and settings are kept).</div>`,
+      foot: `<button class="m-btn" id="adv-cancel">Cancel</button><button class="m-btn primary" id="adv-go">Begin the Tale</button>`,
+    });
+    $("#adv-cancel").onclick = () => Modal.close();
+    $("#adv-go").onclick = () => {
+      const premise = $("#adv-premise").value.trim() || $("#adv-seed").value || "";
+      Modal.close();
+      S.chat = []; S.dmMessages = []; S.quest = { title: "", premise, log: [] };
+      Chat.renderAll();
+      Chat.system("✨ <b>A new adventure begins…</b>");
+      const kickoff = premise
+        ? `Begin a brand-new adventure with this premise: "${premise}". Set the opening scene, introduce the party, and prepare the first map (generate_dungeon or paint what you need). If the party is empty, instead welcome me and ask me to create characters.`
+        : `Begin a brand-new adventure of your own invention, suited to this party. Set the opening scene and prepare the first map. If the party is empty, instead welcome me and ask me to create characters.`;
+      DM.send(kickoff);
+    };
+  },
+};
+
+/* ============================================================
+   MOCK DM — offline demo of the full tool pipeline
+   ============================================================ */
+const MockDM = {
+  step: 0,
+  async run(userText) {
+    DM.status("Mock DM acting…", true);
+    const scripts = this.script();
+    const scene = scripts[Math.min(this.step, scripts.length - 1)];
+    this.step++;
+    for (const beat of scene) {
+      await new Promise(r => setTimeout(r, 250));
+      if (beat.say) Chat.dm(beat.say);
+      if (beat.tool) {
+        const tu = { id: "mock_" + uid(), name: beat.tool, input: beat.input };
+        const result = await DM.gateAndExecute(tu);
+        console.log("[mock tool]", beat.tool, "→", result);
+      }
+    }
+  },
+  script() {
+    const cx = Math.floor(S.map.w / 2), cy = Math.floor(S.map.h / 2);
+    return [
+      [ { say: "*The Mock DM clears its throat.* Welcome, traveler! I'm a scripted stand-in that exercises the real tool pipeline — watch me build a scene. **No API key required.**" },
+        { tool: "update_quest", input: { title: "The Mock Dungeon", entry: "The party stepped into a demonstration." } },
+        { tool: "generate_dungeon", input: { rooms: 6, seed: "mockery" } },
+        { say: "Stone corridors stretch into darkness ahead. From somewhere deeper, you hear the *skitter of clawed feet*. What do you do?" } ],
+      [ { say: "As you press on, shapes emerge from the gloom — **goblins**, blades bared!" },
+        { tool: "spawn_token", input: { name: "Goblin", monster_id: "goblin", team: "enemy", x: cx + 3, y: cy, count: 2 } },
+        { tool: "roll_dice", input: { expression: "1d20+2", reason: "Goblin war-cry (intimidation)", dc: 12 } },
+        { tool: "start_combat", input: {} },
+        { say: "Steel rings out — **initiative is rolled!** Fight from the Combat tab; I'll cheer from here." } ],
+      [ { say: "The Mock DM waves a scripted hand and the wounds close." },
+        { tool: "end_combat", input: { reason: "The demonstration concludes." } },
+        { tool: "award", input: { xp: 60, gold: 15, items: ["Mock Trophy"] } },
+        { say: "That's the whole loop — narration, dice, tokens, combat, loot — through the same dispatcher the real DM uses. Add an API key in ⚙️ Settings for the genuine article. *(Further messages repeat this final beat.)*" } ],
+    ];
+  },
+};
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+const Settings = {
+  open() {
+    Modal.open({
+      title: "⚙️ Settings",
+      body: `
+        <div class="form-row"><label>Anthropic API key</label>
+          <input type="password" id="set-key" value="${esc(S.settings.apiKey)}" placeholder="sk-ant-…">
+          <div class="form-hint">Stored only in this browser's localStorage and sent only to api.anthropic.com. Get a key at console.anthropic.com. Anyone with access to this browser profile can read it — don't use a shared machine.</div>
+        </div>
+        <div class="form-row"><label>Model</label>
+          <select id="set-model">
+            <option value="claude-opus-4-8">Claude Opus 4.8 — best DM (recommended)</option>
+            <option value="claude-sonnet-5">Claude Sonnet 5 — fast & capable</option>
+            <option value="claude-haiku-4-5">Claude Haiku 4.5 — cheapest</option>
+          </select>
+        </div>
+        <div class="form-row"><label>DM autonomy</label>
+          <select id="set-autonomy">
+            <option value="narrator">🗣 Narrator — narrates only; board actions become suggestions</option>
+            <option value="codm">🤝 Co-DM — asks your approval for each board action</option>
+            <option value="full">🎩 Full DM — acts on the board freely (with undo)</option>
+          </select>
+        </div>
+        <div class="form-row"><label><input type="checkbox" id="set-mock" ${S.settings.mock ? "checked" : ""}> Mock DM mode (offline demo, no API key needed)</label></div>
+        <div class="form-row"><label>Danger zone</label>
+          <button class="m-btn" id="set-wipe" style="border-color:#7a3a32;color:#e0a29a">🗑 Erase entire campaign</button>
+        </div>`,
+      foot: `<button class="m-btn primary" id="set-save">Save</button>`,
+    });
+    $("#set-model").value = S.settings.model || "claude-opus-4-8";
+    $("#set-autonomy").value = S.settings.autonomy;
+    $("#set-save").onclick = () => {
+      S.settings.apiKey = $("#set-key").value.trim();
+      S.settings.model = $("#set-model").value;
+      S.settings.autonomy = $("#set-autonomy").value;
+      S.settings.mock = $("#set-mock").checked;
+      $("#autonomy-sel").value = S.settings.autonomy;
+      State.save(); Modal.close();
+      Chat.system("Settings saved." + (S.settings.mock ? " <b>Mock DM enabled.</b>" : ""));
+    };
+    $("#set-wipe").onclick = () => {
+      if (!confirm("Erase EVERYTHING — party, maps, story? This cannot be undone.")) return;
+      localStorage.removeItem("fableboard_save");
+      location.reload();
+    };
+  },
+};
+
+/* ============================================================
+   DICE MODAL
+   ============================================================ */
+const DiceUI = {
+  open() {
+    Modal.open({
+      title: "🎲 Dice Roller",
+      body: `
+        <div id="dice-quick">
+          ${[4, 6, 8, 10, 12, 20, 100].map(f => `<button data-d="${f}">d${f}</button>`).join("")}
+        </div>
+        <div class="form-row"><label>Custom expression</label>
+          <input type="text" id="dice-expr" placeholder="e.g. 2d6+3, 4d6kh3, 1d20adv">
+        </div>
+        <div class="dice-result-big" id="dice-out">—</div>`,
+      foot: `<button class="m-btn primary" id="dice-roll">Roll</button>`,
+    });
+    const out = $("#dice-out");
+    const doRoll = expr => {
+      const r = Dice.post(expr, { who: "You" });
+      if (r) out.innerHTML = `${r.total}<small>${esc(expr)} — ${esc(r.detail)}</small>`;
+      else out.innerHTML = `?<small>couldn't parse that</small>`;
+    };
+    $$("#dice-quick button").forEach(b => b.onclick = () => doRoll("1d" + b.dataset.d));
+    $("#dice-roll").onclick = () => doRoll($("#dice-expr").value.trim() || "1d20");
+    $("#dice-expr").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("#dice-roll").click(); } });
+  },
+};
+
+/* ============================================================
+   APP — init & wiring
+   ============================================================ */
+const App = {
+  mode: "play",
+  init() {
+    const hadSave = State.load();
+    S = State.data;
+    Chat.init();
+    Board.init();
+    Editor.init();
+    this.wire();
+    this.renderAll();
+    $("#autonomy-sel").value = S.settings.autonomy;
+    if (!hadSave) {
+      Chat.system(`<b>Welcome to Fableboard!</b> 🎲`);
+      Chat.system(`1️⃣ Create a hero in the <b>🛡 Party</b> tab &nbsp;2️⃣ add your Anthropic API key in <b>⚙️ Settings</b> (or enable the offline <b>Mock DM</b>) &nbsp;3️⃣ hit <b>✨ New Adventure</b> and tell the DM what tale you crave.`);
+      Chat.system(`Prefer to be your own DM? Use the <b>✏️ Map Editor</b>, place monsters via the DM's suggestions or the editor, and run tactical combat from the <b>⚔️ Combat</b> tab.`);
+    }
+    setInterval(() => State.save(), 6000);
+    window.addEventListener("beforeunload", () => State.save());
+  },
+  wire() {
+    // mode tabs
+    $$(".mode-tab").forEach(t => t.onclick = () => this.switchMode(t.dataset.mode));
+    // sidebar tabs
+    $$(".side-tab").forEach(t => t.onclick = () => this.switchTab(t.dataset.tab));
+    // top bar
+    $("#btn-dice").onclick = () => DiceUI.open();
+    $("#btn-settings").onclick = () => Settings.open();
+    $("#btn-export").onclick = () => State.export();
+    $("#btn-import").onclick = () => $("#import-file").click();
+    $("#import-file").onchange = e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const rd = new FileReader();
+      rd.onload = () => { try { State.import(rd.result); } catch (err) { alert("Import failed: " + err.message); } };
+      rd.readAsText(f);
+      e.target.value = "";
+    };
+    // board tools
+    $("#bt-zoomin").onclick = () => { Board.zoom = clamp(Board.zoom * 1.25, .35, 3); Board.draw(); };
+    $("#bt-zoomout").onclick = () => { Board.zoom = clamp(Board.zoom / 1.25, .35, 3); Board.draw(); };
+    $("#bt-center").onclick = () => Board.center();
+    $("#bt-measure").onclick = () => {
+      Board.measureMode = !Board.measureMode; Board.measureFrom = null;
+      $("#bt-measure").classList.toggle("on", Board.measureMode);
+      Board.draw();
+    };
+    $("#bt-fog").onclick = () => {
+      Board.showFog = !Board.showFog;
+      $("#bt-fog").classList.toggle("on", !Board.showFog);
+      Board.draw();
+    };
+    // party
+    $("#btn-create-char").onclick = () => Creator.start();
+    // combat
+    $("#btn-start-combat").onclick = () => Combat.start();
+    $("#btn-end-combat").onclick = () => Combat.end("Ended manually.");
+    // story
+    $("#autonomy-sel").onchange = e => { S.settings.autonomy = e.target.value; saveSoon(); };
+    $("#new-adventure").onclick = () => DM.newAdventure();
+    $("#undo-dm").onclick = () => DM.undo();
+    $("#chatform").onsubmit = e => { e.preventDefault(); this.sendChat(); };
+    $("#chatinput").addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.sendChat(); }
+    });
+    // keyboard
+    window.addEventListener("keydown", e => {
+      if (e.key === "Escape") {
+        if (Board.targeting) Board.cancelTargeting();
+        Board.measureFrom = null; Board.draw();
+        Modal.close();
+      }
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
+      if (e.key === " " && S.combat.active) { e.preventDefault(); Combat.nextTurn(); }
+    });
+  },
+  sendChat() {
+    const input = $("#chatinput");
+    const text = input.value.trim();
+    if (!text || DM.busy) return;
+    input.value = "";
+    Chat.player(text);
+    DM.send(text);
+  },
+  switchMode(mode) {
+    this.mode = mode;
+    $$(".mode-tab").forEach(t => t.classList.toggle("active", t.dataset.mode === mode));
+    $("#editor-palette").classList.toggle("hidden", mode !== "edit");
+    $("#board").classList.toggle("painting", mode === "edit");
+    if (mode === "edit") { $("#map-w").value = S.map.w; $("#map-h").value = S.map.h; Editor.renderLibrary(); }
+    Board.draw();
+  },
+  switchTab(tab) {
+    $$(".side-tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tab));
+    $$(".side-panel").forEach(p => p.classList.toggle("active", p.id === "tab-" + tab));
+  },
+  renderCombat() { Combat.renderPanel(); },
+  renderAll() {
+    Characters.renderParty();
+    Combat.renderPanel();
+    Board.draw();
+  },
+};
+
+document.addEventListener("DOMContentLoaded", () => App.init());
+</script>
+</body>
+</html>
