@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sleeper-insights"
+version = "0.1.0"
+description = "Standings, power rankings, start/sit and waiver insights for a Sleeper fantasy football league"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+sleeper-insights = "sleeper_insights.cli:main"
+
+[tool.setuptools]
+packages = ["sleeper_insights"]
